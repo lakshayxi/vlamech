@@ -1,0 +1,25 @@
+# upstream checkouts (env/setup_env.sh), environments and caches
+/external
+.envs/
+.cache/
+# raw run records: only summaries, figures and the calibration files below are versioned
+results/**
+!results/**/
+!results/**/summary.md
+!results/**/summary.json
+!results/**/followup.md
+!results/**/followup.json
+!results/**/captions.md
+!results/figures/**/*.png
+!results/oracle_calibration/thresholds.json
+!results/oracle_calibration/passive_drift.json
+!results/oracle_calibration/episodes.md
+!results/calibration_assets/bg_patch_sides.json
+!results/power_analysis/power.json
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+# MuJoCo instability warnings written to the working directory
+MUJOCO_LOG.TXT

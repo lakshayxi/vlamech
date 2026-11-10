@@ -1,0 +1,52 @@
+# Inference + analysis stack (torch / transformers fork installed separately by setup_env.sh)
+numpy==1.26.4
+scipy==1.13.1
+pandas==2.2.2
+statsmodels==0.14.2
+scikit-learn==1.5.1
+matplotlib==3.9.1
+seaborn==0.13.2
+pyyaml==6.0.1
+omegaconf==2.3.0
+tqdm==4.66.4
+rich==13.7.1
+einops==0.8.0
+accelerate==0.32.1
+draccus==0.8.0
+json-numpy==2.1.0
+jsonlines==4.0.0
+timm==0.9.10
+tokenizers==0.19.1
+sentencepiece==0.1.99
+peft==0.11.1
+diffusers==0.30.3
+huggingface_hub==0.24.5
+safetensors==0.4.3
+pillow==10.4.0
+imageio[ffmpeg]==2.34.2
+opencv-python==4.11.0.86   # robosuite requires the full build; one cv2 only (two packages would overwrite each other)
+# Simulation (LIBERO / robosuite)
+mujoco==2.3.7
+robosuite==1.4.1
+bddl==1.0.1
+easydict==1.13
+cloudpickle==3.0.0
+gym==0.26.2
+termcolor==2.4.0
+h5py==3.11.0
+hydra-core==1.3.2
+future==1.0.0
+# Testing
+pytest==8.3.2
+# Image preprocessing must match the RLDS training pipeline exactly (JPEG round-trip + lanczos3 resize);
+# OpenVLA-OFT implements it with TensorFlow, so we use the CPU build only for that.
+tensorflow-cpu==2.15.0
+# tensorflow_datasets 4.9.3 runtime deps (tfds itself + dlimp are installed --no-deps by setup_env.sh)
+array_record==0.8.1
+click==8.5.0
+dm-tree==0.1.10
+etils[enp,epath,etree]==1.13.0
+promise==2.3
+tensorflow-metadata==1.17.2   # 1.21 is protobuf-5 generated code; 1.17.x declares protobuf>=4.21.6,<4.22
+protobuf==4.21.12   # satisfies tensorflow-cpu 2.15 AND tensorflow-metadata 1.17 (4.25 broke tfmetadata's declared range)
+wandb==0.17.9       # imported at module level by upstream experiments/robot/openvla_utils.py

@@ -1,0 +1,30 @@
+# Second environment, for pi0.5 (LeRobot) only; OFT keeps env/requirements.txt. Installed by env/setup_env_lerobot.sh
+# together with lerobot and its patched transformers in ONE resolver call (pins below take precedence).
+torch==2.7.1          # lerobot 0.4.4 needs torch>=2.2.1 and torchvision>=0.21 (-> torch>=2.6); default PyPI cu126 wheel
+torchvision==0.22.1
+numpy==1.26.4         # same as the OFT env: robosuite 1.4.1 / LIBERO were validated with it
+opencv-python-headless==4.11.0.86   # lerobot requires the headless build (<4.13); 4.11 is the last one that accepts numpy 1.x
+scipy==1.13.1         # same as the OFT env (lerobot[pi] requires <1.15)
+pandas==2.2.2
+pyyaml==6.0.1
+matplotlib==3.9.1
+pillow==10.4.0
+imageio[ffmpeg]==2.34.2
+# Simulation (LIBERO / robosuite): identical versions to the OFT env, so both policies act in the same simulator
+mujoco==2.3.7
+robosuite==1.4.1
+bddl==1.0.1
+easydict==1.13
+cloudpickle==3.0.0
+gym==0.26.2
+termcolor==2.4.0
+h5py==3.11.0
+hydra-core==1.3.2
+future==1.0.0
+numba==0.68.1        # robosuite dependency; same as the OFT env lock (unpinned, pip backtracks through old sdists)
+llvmlite==0.50.0
+networkx==3.4.2
+PyOpenGL==3.1.10
+glfw==2.11.0
+# Testing
+pytest==8.3.2

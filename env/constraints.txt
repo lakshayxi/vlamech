@@ -1,0 +1,6 @@
+# Hard pins that no dependency may override (applied with pip --constraint).
+torch==2.2.0
+torchvision==0.17.0
+numpy==1.26.4
+tokenizers==0.19.1
+protobuf==4.21.12

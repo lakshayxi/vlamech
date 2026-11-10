@@ -1,0 +1,31 @@
+# Written by scripts/download_models.py. Do not edit by hand.
+lerobot/pi05_libero_finetuned_v044:
+  files:
+    config.json: 2f6d4b96b032593e1de65b391ee7252a70227bff398ef1b94658fea17818142f
+    model.safetensors: 877b3ec1130548b69af7f8aeef3ec9d3fc7738040f0b9beb490857ec970997ae
+    policy_postprocessor.json: 37d719a6584600988e6c343306d2eaee0575109f235ad500313577f73e47e8a1
+    policy_postprocessor_step_0_unnormalizer_processor.safetensors: a002c0df7f79c5b169c5a899ad151d4ea1bed246c7d82bd93ed1556558d517a9
+    policy_preprocessor.json: 3d669ffc18d0364536735d8203076dcc69d3a6523aa5956ccaada3f9e1e6b748
+    policy_preprocessor_step_2_normalizer_processor.safetensors: a002c0df7f79c5b169c5a899ad151d4ea1bed246c7d82bd93ed1556558d517a9
+    train_config.json: 199518b79faeaef0877e9a1eb5f2df6884902476a7d4491c7f865142c3fe90fd
+  revision: 7152f13e34c6c115d808aea0e5d08aca74eac14b
+moojink/openvla-7b-oft-finetuned-libero-goal:
+  files:
+    action_head--50000_checkpoint.pt: b97c2e8939ede32d8a1b29e9565d70f22040ba9e54925665e81989a0cc13ccff
+    added_tokens.json: ab43123267b190cb7990bc9f2ae4ad32dcb7ed029fb0fccb1b4e062c6f54a2a1
+    config.json: edd5c5cf6d7927e07465cf086ebe41f7b3ec8f3b128a51f71d6db14dad7ad8b1
+    dataset_statistics.json: 22e0549a346b2ec8a109904d017a57c50f12769b91653939aefb72b119725d47
+    generation_config.json: 67fbe17b12e8beb5be98eb911483971cc78589e51a37ac0cce9cd499d06a8bf1
+    model-00001-of-00004.safetensors: aae1b9bfffacaf15e209bc8296ffa9bd07baa41d673ab005696a82525b880b2f
+    model-00002-of-00004.safetensors: 4cd51d327e1891f24f75d033017ed3824cc5fb9009e38498efd2dca6f89ee01d
+    model-00003-of-00004.safetensors: f1c361c4cbd78b60ccea81538ca1626e00e54baba70528af8c08577771768329
+    model-00004-of-00004.safetensors: a877e3fece1feafb80f59f91585ce04379ee39e2bf9a25cb7b4acf237e896e60
+    model.safetensors.index.json: ca8b53fed8133ee2afcd2fc483de8febf7f5bb0f6bcb09f91189772e59e8f659
+    preprocessor_config.json: bd024783fb785cbdfe35b710b621c5e8678d4c157a9ba625675e67d40d1757da
+    processor_config.json: 167e026d8121f6cb0bf5c18310b97ba8139152f970822bb3824213bd37dc7a76
+    proprio_projector--50000_checkpoint.pt: 780595e9cca5292348697686f9ccc83d39d9d3d303e860d62c6d4609952dfff1
+    special_tokens_map.json: cb90ee5cf5793aa444039af9795b00db59d3fef8942e7eca9cf1990bab370d61
+    tokenizer.json: 8f5e2869e1807b8bb3c7717a294539c37e9de5d728ad60e31ef57e83cc5ea527
+    tokenizer.model: 9e556afd44213b6bd1be2b850ebbbd98f5481437a8021afaf58ee7fb1818d347
+    tokenizer_config.json: f5f1d3ed015ebb71cf11686ff00bc8e0c25957bbf3952f95312cecc9b168fbea
+  revision: c2d0f9fbbd82674683b397ff923168a12f6a307b

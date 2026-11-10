@@ -1,0 +1,6 @@
+# Mitigation arm frozen by the selection rule on exploratory data. Written once by
+# scripts/analyze_mitigation.py --select, never edited.
+arms:
+- cag:3
+frozen: '2026-11-09T15:13:24'
+selected: cag:1

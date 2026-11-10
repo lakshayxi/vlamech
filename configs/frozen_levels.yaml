@@ -1,0 +1,57 @@
+# Corruption levels and oracle thresholds frozen after calibration, before any held-out run.
+# Written once by scripts/freeze_levels.py, never edited.
+frozen: '2026-11-06T17:25:57'
+corruption:
+  identity:
+    levels:
+    - null
+  target_occlusion:
+    levels:
+    - null
+  matched_bg_box:
+    levels:
+    - null
+  photometric:
+    levels:
+    - 3.5
+    - 4.5
+    unreachable_targets:
+    - 0.3
+    benign: false
+  noise:
+    levels:
+    - 64.0
+    - 128.0
+    unreachable_targets: []
+    benign: false
+  blur:
+    levels:
+    - 1.0
+    - 4.0
+    - 8.0
+    unreachable_targets: []
+    benign: false
+  jpeg:
+    levels:
+    - 6.0
+    - 1.0
+    unreachable_targets:
+    - 0.3
+    benign: false
+  bg_patches:
+    levels:
+    - 0.8
+    unreachable_targets:
+    - 0.3
+    - 0.6
+    benign: false
+variants:
+  exact_model_input:
+  - bg_patches
+oracle:
+  classifier_version: 2
+  trace_schema: 1
+  thresholds_file: results/oracle_calibration/thresholds.json
+  thresholds_sha256: 9737b16d773bcecca9f69b24a55f31e9e9d79ab286b77ab5b47ccf968961dd24
+sources:
+  calibration_summary_sha256: 6da39f6e4f589dd81838a1728a771d4e5eb642d90a331bb208d1199b96f451e5

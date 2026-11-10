@@ -1,0 +1,5 @@
+# uv overrides for env/setup_env_lerobot.sh (replace a dependency's declared requirement).
+# rerun-sdk (lerobot>=0.4: visualization scripts only, utils/visualization_utils.py; never imported by the pi0.5
+# policy, processors or env utils) requires numpy>=2, which would change the simulator stack (mujoco 2.3.7 /
+# robosuite 1.4.1 run on numpy 1.26.4 in the OFT env). The marker below never matches, so it is not installed.
+rerun-sdk ; sys_platform == "never"

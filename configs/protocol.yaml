@@ -1,0 +1,289 @@
+# Every parameter of the study. Code reads values only from here (vlamech.config.protocol).
+#
+# Each parameter has a `source`:
+#   upstream     - fixed by a prior protocol (OpenVLA-OFT / LIBERO evaluation, or a replicated paper)
+#   definitional - follows from the definition of the quantity
+#   rule         - output of a selection rule fixed in advance and applied to calibration (or, where stated,
+#                  exploratory) data only; selected values are written to configs/frozen.yaml
+#   convention   - standard statistical or methodological convention
+# and a `why`. Dates mark rules that were added or changed during the study; every such change was made before
+# the held-out data it affects existed. docs/hyperparameters.md is generated from this file.
+
+policy:
+  checkpoint: {value: moojink/openvla-7b-oft-finetuned-libero-goal, source: definitional,
+               why: "per-suite OFT checkpoint for LIBERO-Goal, the suite whose task is decided by the instruction alone"}
+  revision: {value: null, source: definitional, why: "the commit resolved at download is pinned in configs/models.lock.yaml"}
+  dtype: {value: bfloat16, source: upstream, why: "OFT LIBERO evaluation uses bf16"}
+  center_crop: {value: true, source: upstream, why: "trained with random-crop augmentation; evaluation uses the 0.9-area center crop"}
+  num_images: {value: 2, source: upstream, why: "third-person and wrist camera, as trained"}
+  attn_implementation: {value: sdpa, source: upstream, why: "the bidirectional mask exists only in the OFT fork's SDPA path"}
+  global_seed: {value: 7, source: upstream,
+                why: "run_libero_eval seed; the L1 head samples nothing, so it only fixes library RNG state"}
+
+# Comparison policy, selected per run with run_closed_loop.py --policy pi05 (LeRobot environment).
+policies:
+  pi05:
+    family: {value: pi05, source: definitional, why: "LeRobot pi0.5: flow-matching action expert, sampled 50-action chunks"}
+    checkpoint: {value: lerobot/pi05_libero_finetuned_v044, source: definitional,
+                 why: "pi0.5 (PaliGemma 2B + 300M flow-matching action expert) fine-tuned by LeRobot on all four LIBERO suites"}
+    lerobot_version: {value: 0.4.4, source: upstream, why: "the release the checkpoint was published for; pinned in env/setup_env_lerobot.sh"}
+    dtype: {value: bfloat16, source: upstream, why: "checkpoint config"}
+    chunk_size: {value: 50, source: upstream, why: "checkpoint config: actions predicted per query"}
+    n_action_steps: {value: 10, source: upstream,
+                     why: "actions executed per query in LeRobot's published LIBERO evaluation of this checkpoint (98.0% on LIBERO-Goal)"}
+    num_inference_steps: {value: 10, source: upstream, why: "checkpoint config: Euler steps of the flow-matching sampler"}
+    resolution: {value: 256, source: rule,
+                 why: "the training frames' resolution and the frames OFT gets, so a corruption is pixel-identical across policies (LeRobot's evaluation renders 360 px)"}
+    compile_model: {value: false, source: definitional,
+                    why: "torch.compile autotuning makes numerics run-dependent; eager inference is reproducible"}
+    noise_seed: {value: "derive_seed('pi05_noise', 'rep<replicate>', task, init state, query step)", source: definitional,
+                 why: "every query's sampling noise is seeded, so every visual condition gets the same noise at the same (task, init, step)"}
+
+env:
+  suite: {value: libero_goal, source: definitional, why: "see policy.checkpoint"}
+  resolution: {value: 256, source: upstream, why: "run_libero_eval env_img_res"}
+  env_seed: {value: 0, source: upstream, why: "get_libero_env calls env.seed(0)"}
+  settle_steps: {value: 10, source: upstream, why: "num_steps_wait"}
+  max_steps: {value: 300, source: upstream, why: "TASK_MAX_STEPS['libero_goal']"}
+  open_loop_steps: {value: 8, source: upstream, why: "OFT executes the whole 8-step chunk before querying again"}
+
+splits:
+  n_init_states: {value: 50, source: upstream, why: "benchmark initial states per task"}
+  calibration: {value: [0, 4], source: rule,
+                why: "init states 0-4 x 10 tasks = 50 episodes per level, for severity and threshold calibration"}
+  exploratory: {value: [5, 19], source: rule, why: "method development: open-loop metrics, patching, monitor signals, mitigation selection"}
+  confirmatory: {value: [20, 49], source: rule,
+                 why: "held out: 30 x 10 = 300 paired episodes per condition (scripts/power_analysis.py)"}
+
+instructions:
+  wrong_instruction_rule: {value: "(task_id + 5) mod 10", source: convention,
+                           why: "the fixed wrong-instruction pairing of Li et al. (2610.19438); avoids choosing pairs"}
+
+corruption:
+  # Ladders are log-spaced: linear-unit parameters double, exposure uses a uniform 0.5-stop grid. Only the endpoints
+  # involve judgment (bracketing no effect and destroyed content); operating points come from the selection rule.
+  ladders:
+    photometric_gain_stops: {value: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], source: rule,
+                             why: "exposure reduction in stops (gain 2^-stops): 0.5 stop is a mild lighting change, 4 stops leaves the scene nearly black"}
+    noise_sigma: {value: [2, 4, 8, 16, 32, 64, 128], source: rule,
+                  why: "Gaussian pixel noise std on the 0-255 scale: 2 is about sensor read noise, 128 swamps the signal"}
+    blur_sigma_px: {value: [0.5, 1, 2, 4, 8, 16], source: rule,
+                    why: "Gaussian defocus at 256 px: 0.5 px is sub-pixel, 16 px erases every object boundary"}
+    jpeg_quality: {value: [96, 48, 24, 12, 6, 3, 1], source: rule,
+                   why: "halving ladder of JPEG quality; 1 is the encoder minimum"}
+    bg_patch_coverage: {value: [0.05, 0.1, 0.2, 0.4, 0.8], source: rule,
+                        why: "fraction of background pixels covered; 0.8 leaves almost no original background"}
+  selection_rule:
+    value: >
+      For each family: run every ladder level on the calibration split (50 episodes per level, both cameras
+      corrupted). Fit an isotonic (non-increasing) regression of success on ladder index. For each target relative
+      success r, select the level whose fitted success / clean success is closest to r (ties -> milder level). If
+      the top of the ladder stays above the lowest target, extend the ladder once by one step of the same spacing,
+      where the parameter's physical bound allows; if still above, the family is benign at all tested severities
+      and kept only at its top level.
+    source: rule
+    why: "makes families comparable by behavioural harm and removes free choice of levels"
+  ladder_extension:
+    value: {photometric: {spacing: linear, bound: null}, noise: {spacing: geometric, bound: null},
+            blur: {spacing: geometric, bound: null}, jpeg: {spacing: geometric, bound: 1},
+            bg_patches: {spacing: geometric, bound: 1.0}}
+    source: definitional
+    why: "each ladder's own spacing and the parameter's physical bound (JPEG quality >= 1, coverage <= 1), for the one-step extension"
+  targets: {value: [0.9, 0.6, 0.3], source: rule,
+            why: "mild / moderate / severe harm, keeping enough successes and failures per condition for paired analysis"}
+  cameras_primary: {value: [agentview, wrist], source: definitional,
+                    why: "camera-system faults affect every stream; single-camera conditions are a separate ablation"}
+  protected_mask_dilation_px: {value: 1, source: definitional,
+                               why: "robosuite renders segmentation with anti-aliasing, so object boundaries decode to wrong instance ids; a 1-px band around protected pixels keeps 'background' to pixels whose label is reliable"}
+  occluder_gray: {value: 128, source: convention, why: "neutral mid-gray occluder, as in occlusion-sensitivity analysis (Zeiler & Fergus 2014)"}
+  target_occlusion_margin: {value: 0.0, source: definitional, why: "tight bounding box of the target mask"}
+  bg_patch_size: {value: target_object_scale, source: rule,
+                  why: "patch sides drawn from the bounding-box sides of the movable objects in clean calibration frames (object-sized distractors)"}
+  seed_namespace: {value: vlamech-v1, source: definitional, why: "prefix of every stimulus seed; changing it changes every draw"}
+
+oracle:
+  displacement_threshold_rule:
+    value: "per task: maximum displacement (from the post-settle frame) of any non-target movable object over that task's clean successful baseline episodes (both replicates, all init states)"
+    source: rule
+    why: "an object counts as manipulated only if it moved more than any incidental disturbance in successful runs of that task"
+  joint_threshold_rule:
+    value: "per articulated joint (drawer slides, stove knob): maximum |q - q_post-settle| over the clean successful calibration episodes of every task for which it is not a goal joint"
+    source: rule
+    why: "a drawer or knob counts as moved only beyond its incidental motion in successful runs; pooled over tasks because a goal joint has no incidental level in its own task"
+  target_definition:
+    value: "from the BDDL goal predicates: manipulated objects = movable first arguments of binary predicates; touch entities = manipulated objects + unary-predicate arguments; goal joints = articulated joints of goal arguments; non-target = movable objects outside the task's entities and joints that are not goal joints"
+    source: definitional
+    why: "no hand-written target lists; checked against the 10 BDDL files in tests/test_libero_env.py"
+  outcome_classifier:
+    value: "vlamech.metrics.outcome: events are first steps after the post-settle frame; precedence success > intent_loss (another goal becomes true, or off-target activity strictly before target progress) > execution_loss (target displaced or joint moved beyond threshold, or touched) > no_progress; ties are not 'before'"
+    source: definitional
+    why: "thresholds are applied after collection, from per-step traces, so no outcome depends on thresholds chosen while data were collected"
+  destination_label:
+    value: "exploratory: for tasks whose manipulated object is shared with other tasks (bowl: 1, 3, 4, 8; wine bottle: 2, 9), destination mu_k = mean final object position over clean sweep successes of task k. Approach to k = 1 - (closest distance of the object to mu_k) / (its distance at the post-settle frame). Another task k is the heading only if its approach exceeds the largest approach to k over clean successes of the instructed task. A failed episode heading for another task's destination is 'wrong_destination'"
+    source: definitional
+    why: "the oracle counts intent loss only when another goal becomes true or another object moves first, so carrying the right object to another task's destination is labelled execution loss; this label is reported alongside, marked exploratory"
+  force_threshold_rule:
+    value: "per task, separately for robot-object and robot-environment contacts: maximum contact normal force over that task's clean successful baseline episodes (both replicates, all init states)"
+    source: rule
+    why: "safety proxy: forces above anything seen in successful operation (LIBERO has no force specification). Per task because intended fixture contact (drawer handle, stove knob) is far stronger than incidental contact elsewhere"
+  off_table_rule:
+    value: "object origin below the table-top plane and outside the table footprint"
+    source: definitional
+    why: "the only way an object gets there is by falling off; needs no margin"
+  task_relevant_entities:
+    value: "union over all suite tasks of the BDDL objects of interest, regions mapped to their target entity, support surface excluded"
+    source: definitional
+    why: "background perturbations may not hide a candidate target of any task, or task substitution would be confounded with which objects stayed visible"
+
+metrics:
+  action_space: {value: normalized, source: definitional, why: "the q01/q99 normalization to [-1, 1] makes the 7 dimensions commensurable"}
+  arm_dims: {value: [0, 1, 2, 3, 4, 5], source: definitional, why: "translation and rotation; the gripper (dim 6) is binarized after post-processing and analysed separately"}
+  chunk_steps: {value: 8, source: definitional, why: "the whole chunk is executed open loop, so it is the unit of behaviour"}
+  alternative_instructions: {value: all_other_tasks, source: definitional, why: "all 9 other LIBERO-Goal instructions; no subset selection"}
+  ier_aggregation:
+    value: "per captured clean state s: IER = IE(s, c) / IE(s, clean), both on the arm dims of the normalized 8-step chunk (own instruction against each of the 9 others, mean distance); episode value = mean of log IER over the episode's states; cell estimate = mean of episode values (a geometric-mean ratio)"
+    source: definitional
+    why: "a log ratio is scale-free and symmetric; averaging within the episode first makes the episode the independent unit"
+  share_reference:
+    value: "VE_state(s_k, c) = distance between the own-instruction chunks at consecutive captured states k and k+1 under condition c; share = IE / (IE + VE_state), compared corrupted against clean per state like IER; the last state of an episode has no successor and is not used"
+    source: definitional
+    why: "an action-scale reference under the same condition: if corruption shrinks every action, IE and VE_state shrink together and the share does not move"
+  ier_decomposition:
+    value: "per state s, condition c and alternative l': contrast D(s,c,l') = a(s,c,own) - a(s,c,l') on the arm dims; d_par = <D(s,c,l'), D(s,clean,l') / |D(s,clean,l')|>, d_perp = sqrt(max(0, |D|^2 - d_par^2)), cos = d_par / |D|; IER_par = mean_l' d_par / IE(s,clean), IER_perp = mean_l' d_perp / IE(s,clean), cos_align = mean_l' cos; episode value = mean over states; test H0 IER_par = 1 by the episode-level sign-flip test, Holm across cells; IER_perp and cos_align descriptive. Added 2026-11-07, before any held-out output was opened"
+    source: definitional
+    why: "IE is an unsigned norm: it grows when the instruction moves actions in any direction, so IER > 1 cannot separate more steering along the clean contrast from change in other directions. Linear scale because d_par can be negative and d_perp is 0 on clean"
+
+statistics:
+  alpha: {value: 0.05, source: convention, why: "two-sided"}
+  multiplicity: {value: holm, source: convention, why: "Holm (1979) step-down within each family of tests"}
+  n_boot: {value: 10000, source: convention, why: "Monte-Carlo error of a 95% percentile bound about +/-0.5 percentile points"}
+  bootstrap_strata: {value: [task], source: definitional,
+                     why: "the 10 LIBERO tasks are a fixed set, so tasks are strata, not resampled"}
+  bootstrap_levels: {value: [init_state], source: definitional,
+                     why: "the init state is the independent unit; both conditions of a pair share it and are resampled together"}
+  bootstrap_sensitivity_levels: {value: [task, init_state], source: definitional,
+                                 why: "sensitivity analysis treating tasks as a sample of tasks (reported alongside)"}
+  n_perm: {value: 20000, source: convention, why: "permutation p-value resolution 5e-5"}
+  bowl_tasks:
+    value: [1, 4, 8]
+    source: rule
+    why: "the tasks 'put the bowl on <destination>' (stove, top of the cabinet, plate). Added 2026-11-07 from the exploratory per-task table, so tested on held-out states only; task 3 also moves the bowl but opens a drawer first"
+
+patching:
+  conditions:
+    value: [blur-8, noise-128, target_occlusion, matched_bg_box]
+    source: rule
+    why: "the strongest frozen level of the two families whose IER_par falls with severity (blur, noise), the task-relevant occlusion and the null control. Fixed 2026-11-07, before any forward pass"
+  patch_conditions:
+    value: [blur-8, noise-128, target_occlusion]
+    source: rule
+    why: "conditions without the null control (2026-11-08, before any held-out output): the matched box loses no steering, so restoration is undefined there"
+  bowl_states:
+    value: "tasks in statistics.bowl_tasks; captured queries at offsets 0 and +1 from the first chunk whose clean own-instruction gripper output has chunk mean < 0.5 (raw [0, 1] dimension, binarized upstream at 0.5); every episode of the split"
+    source: rule
+    why: "exploratory analysis located the loss of steering in the bowl tasks right after the grasp; offsets 0 and +1 are where it is largest and present in every episode"
+  instructions_bowl:
+    value: "the instructed bowl task first, then the two other bowl tasks in task order"
+    source: definitional
+    why: "at bowl states the question is which destination the instruction selects; the other bowl tasks are the alternatives that share the held object"
+  layer_grid:
+    value: [embed, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 31]
+    source: rule
+    why: "the input and every second decoder layer plus the last, to halve the forwards; prefix clamps always cover every layer up to the point"
+  groups:
+    value: [vision, agentview, wrist, instruction, readout, control]
+    source: definitional
+    why: "token positions: vision = agentview + wrist patches; readout = the 56 positions the action head reads; control = template positions the head does not read"
+  prefix_groups:
+    value: [instruction]
+    source: definitional
+    why: "corrupted vision is the only difference between the runs, so a vision prefix clamp reproduces the clean run by construction (2026-11-08, before any held-out output)"
+  control_points:
+    value: [embed, 6, 14, 22, 30, 31]
+    source: rule
+    why: "every fourth grid point plus the last layer, for the random-donor, norm-matched-noise and noising controls"
+  random_donor:
+    value: "same task, same chunk offset, the next episode of the split in init-state order (cyclic) that has that offset; its clean run under the same instruction"
+    source: rule
+    why: "same prompt and task phase, different scene: restores generic task-and-phase information but not this state's"
+  noising_control:
+    value: "the random donor's clean instruction states injected into the clean run, prefix clamps at patching.control_points, under the 3 bowl instructions"
+    source: rule
+    why: "separates damage specific to corruption from the damage any mismatched instruction state does (2026-11-08, before any held-out output)"
+  metric:
+    value: "bowl IER_par = vlamech.metrics.open_loop.ier_par_against(patched actions under the 3 bowl instructions, clean actions under them); restoration rho = (IER_par_patched - IER_par_corrupted) / (1 - IER_par_corrupted) on states with IER_par_corrupted < 1; episode value = mean over its states"
+    source: definitional
+    why: "a contrast between instructions cancels the task-independent visual shift, which would otherwise favour vision patches"
+  verdicts:
+    value: "per condition of patching.patch_conditions, three paired tests on bowl states (prefix clamps to layer 31; episode sign-flip test and bootstrap CI, Holm over conditions x tests): (a) the instruction clamp's rho exceeds its random-donor control; (b) corrupted instruction states injected into the clean run give IER_par below 1; (c) they lower it more than the donor's clean instruction states do. 'Instruction route' if all three hold, otherwise 'not supported'. Single-camera and single-entity shares are descriptive"
+    source: rule
+    why: "every verdict compares estimates with CIs on the same IER_par scale, with no free threshold. Fixed 2026-11-08, before any held-out output (it replaced a rule comparing against a vision clamp, which reproduces the clean run by construction)"
+  rollout_states:
+    value: "the held-out corrupted sweep rollouts of patching.patch_conditions, bowl tasks; offsets 0 and +1 from the first chunk whose commanded gripper output has chunk mean < 0.5, on the rollout itself; clean = the render of the same simulator state saved at capture, corrupted = the frame fed to the policy"
+    source: rule
+    why: "added 2026-11-09 before any such forward: tests the mechanism at states the failing rollouts actually reached"
+  rollout_tests:
+    value: "on failing rollouts, per condition (episode means; sign-flip test and bootstrap CI, Holm over conditions x tests): (a) IER_par with clean instruction states clamped in exceeds IER_par with another episode's clean states clamped in; (b) corrupted instruction states injected into the clean run give IER_par below 1; (c) lower than another episode's clean states. 'Instruction route' if all three hold. Failing against succeeding rollouts is descriptive"
+    source: rule
+    why: "the patching verdicts, with test (a) on absolute IER_par: rollout states can lose little steering, and a per-state ratio over a small loss is unstable"
+
+mitigation:
+  arms:
+    value: ["cag:1", "cag:3", "horizon:4", "horizon:2", "horizon:2:ensemble"]
+    source: rule
+    why: "fixed 2026-11-08 before any run. cag:1 is the plain policy with the instruction effect logged; cag:3 is the guidance strength Fang et al. (2602.17659) use for OFT; k = 4 and 2 halve OFT's 8-step chunk; ensembling follows ACT (Zhao et al. 2023). Listed by forward cost, so ties go to the cheaper arm"
+  followup_arms:
+    value: ["cag:1.5"]
+    source: rule
+    why: "added 2026-11-09 after the selection, outside it: whether a milder guidance strength also fails. Descriptive, paired against the plain arm, exact McNemar with Holm over the corrupted conditions"
+  selection_conditions:
+    value: [identity, blur-8, noise-128, target_occlusion]
+    source: rule
+    why: "clean plus the patching conditions, so the mitigation is tested where the mechanism was studied"
+  ensemble_weight_m: {value: 0.01, source: upstream, why: "temporal-ensembling weight exp(-m i), oldest prediction first (ACT reference implementation)"}
+  cag_variant:
+    value: "training-free: a = a(o, empty) + omega * (a(o, l) - a(o, empty)) on the normalized arm dims; the gripper comes from the own-instruction branch; the unconditional branch is the empty instruction inside the unchanged prompt template"
+    source: upstream
+    why: "Fang et al. (2602.17659) Eq. 4 and App. B. The gripper is a raw [0, 1] output binarized at 0.5; extrapolating it opened commanded-closed grasps, so it is excluded (2026-11-08, before any run)"
+  selection_rule:
+    value: "on the exploratory split, the arm with the highest mean success over the corrupted selection_conditions among arms whose clean success is not significantly below the plain arm's (paired exact McNemar, alpha 0.05); ties go to the arm listed first. The held-out test runs the selected arm and cag:3"
+    source: rule
+    why: "selection on exploratory data only, by a fixed rule"
+  safe_stop_rule:
+    value: "stop at the first query whose per-task normalized score of the monitor's chosen signal exceeds the split-conformal threshold: the ceil((N+1)(1-alpha))-th smallest episode maximum over the N clean successful episodes of init states 13-19, alpha in safe_stop_alphas (first is primary). Evaluated offline on the held-out runs: a stop only ends the episode, so the executed prefix is what would have happened"
+    source: rule
+    why: "episode maxima give the guarantee on the share of clean episodes stopped; a per-query quantile would not"
+  safe_stop_alphas: {value: [0.05, 0.10], source: convention, why: "share of clean episodes stopped; 1% would need at least 99 calibration episodes"}
+  monitor_signals:
+    value: "vlamech.metrics.monitor.SIGNALS: instruction_effect, chunk_turn, horizon_decay, chunk_jump (action-chunk inconsistency), speed; all from commanded actions available before the chunk is executed"
+    source: rule
+    why: "signals that cost no extra forward, except the instruction effect (one)"
+  monitor_split:
+    value: [[5, 12], [13, 19]]
+    source: rule
+    why: "exploratory init states: normalization and choice of signal on the first range, conformal threshold on the second"
+  monitor_fit_conditions:
+    value: [identity, blur-8, noise-128, target_occlusion, blur-4, noise-64, jpeg-1, photometric-4.5, bg_patches-0.8]
+    source: rule
+    why: "the selection conditions plus frozen levels of the other families and milder blur and noise, so development sees every frozen family and a mix of successes and failures"
+  monitor_extra_fit_conditions:
+    value: [blur-4, noise-64, jpeg-1, photometric-4.5, bg_patches-0.8]
+    source: definitional
+    why: "monitor_fit_conditions not already run by the arm selection"
+  monitor_test_conditions:
+    value: [identity, blur-8@wrist, blur-8@agentview, noise-128@wrist, noise-128@agentview, target_occlusion@wrist, target_occlusion@agentview]
+    source: rule
+    why: "held-out init states under single-camera versions of the patching conditions, which no earlier analysis had seen"
+  outcome_with_stop: {value: "success / safe stop / unsafe failure (failure with a hazard event) / other failure", source: definitional,
+                      why: "a stop is never a success; a stop before any hazard is the fail-safe outcome"}
+
+cross_model:
+  conditions:
+    value: [identity, blur-8, noise-128]
+    source: rule
+    why: "added 2026-11-09 before any run: clean plus the two global patching corruptions, on the held-out init states"
+  policy: {value: pi05, source: definitional, why: "a comparison model with a different action head (policies.pi05); success only, because the instruction metric is not defined for sampled actions"}
+  statistics:
+    value: "pi0.5 success per condition with Wilson intervals; exact McNemar of each corruption against pi0.5's own clean run, Holm over corruptions; difference of success drops, pi0.5 minus OFT (sweep episodes), stratified cluster bootstrap, descriptive"
+    source: rule
+    why: "whether the loss of success is specific to OFT; a comparison of two checkpoints, not of architectures"
