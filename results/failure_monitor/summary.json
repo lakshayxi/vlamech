@@ -1,0 +1,243 @@
+{
+  "dev_auroc": {
+    "instruction_effect": 0.4304324707550514,
+    "chunk_turn": 0.802503947665238,
+    "horizon_decay": 0.590731848796365,
+    "chunk_jump": 0.7816618865005962,
+    "speed": 0.2332183945087171
+  },
+  "chosen": "chunk_turn",
+  "n_calibration": 70,
+  "thresholds": {
+    "0.05": 7.460236375162322,
+    "0.1": 5.5236021156875
+  },
+  "lengths": {
+    "0": 18,
+    "1": 11,
+    "2": 12,
+    "3": 23,
+    "4": 11,
+    "5": 16,
+    "6": 12,
+    "7": 10,
+    "8": 10,
+    "9": 18
+  },
+  "test_failure_rate": 0.1961904761904762,
+  "auroc": {
+    "instruction_effect": [
+      0.5639724152210923,
+      0.5319680899510436,
+      0.5969535092245711
+    ],
+    "chunk_turn": [
+      0.7362162379791101,
+      0.7101590270568414,
+      0.762218843038648
+    ],
+    "horizon_decay": [
+      0.5675527998895689,
+      0.5347425523969607,
+      0.6003134328131122
+    ],
+    "chunk_jump": [
+      0.7625931762757098,
+      0.7386156767561101,
+      0.7860043100222476
+    ],
+    "speed": [
+      0.23721414438871763,
+      0.209145257153925,
+      0.2672190951715294
+    ]
+  },
+  "ie_minus": {
+    "chunk_turn": [
+      -0.17224382275801775,
+      -0.22307805420304588,
+      -0.12119492835045506
+    ],
+    "horizon_decay": [
+      -0.003580384668476544,
+      -0.06118643886180166,
+      0.059173302108241246
+    ],
+    "chunk_jump": [
+      -0.19862076105461746,
+      -0.2525842827134576,
+      -0.143170309791096
+    ],
+    "speed": [
+      0.3267582708323747,
+      0.2731386304215231,
+      0.37934895087565673
+    ]
+  },
+  "safe_stop": {
+    "0.05": {
+      "identity": {
+        "n": 300,
+        "failure": 0.02666666666666667,
+        "stopped": 0.03666666666666667,
+        "success_lost": 0.023333333333333334,
+        "unsafe_without": 0.01,
+        "unsafe_with": 0.0033333333333333335,
+        "p": 0.5
+      },
+      "blur-8@wrist": {
+        "n": 300,
+        "failure": 0.28,
+        "stopped": 0.3233333333333333,
+        "success_lost": 0.18333333333333332,
+        "unsafe_without": 0.03,
+        "unsafe_with": 0.0,
+        "p": 0.00390625,
+        "p_holm": 0.01953125
+      },
+      "blur-8@agentview": {
+        "n": 300,
+        "failure": 0.11666666666666667,
+        "stopped": 0.12666666666666668,
+        "success_lost": 0.04666666666666667,
+        "unsafe_without": 0.01,
+        "unsafe_with": 0.006666666666666667,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "noise-128@wrist": {
+        "n": 300,
+        "failure": 0.2633333333333333,
+        "stopped": 0.2633333333333333,
+        "success_lost": 0.15,
+        "unsafe_without": 0.01,
+        "unsafe_with": 0.0,
+        "p": 0.25,
+        "p_holm": 1.0
+      },
+      "noise-128@agentview": {
+        "n": 300,
+        "failure": 0.14666666666666667,
+        "stopped": 0.17,
+        "success_lost": 0.06,
+        "unsafe_without": 0.0033333333333333335,
+        "unsafe_with": 0.0033333333333333335,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "target_occlusion@wrist": {
+        "n": 300,
+        "failure": 0.48333333333333334,
+        "stopped": 0.44666666666666666,
+        "success_lost": 0.12,
+        "unsafe_without": 0.04666666666666667,
+        "unsafe_with": 0.006666666666666667,
+        "p": 0.00048828125,
+        "p_holm": 0.0029296875
+      },
+      "target_occlusion@agentview": {
+        "n": 300,
+        "failure": 0.056666666666666664,
+        "stopped": 0.13333333333333333,
+        "success_lost": 0.08666666666666667,
+        "unsafe_without": 0.006666666666666667,
+        "unsafe_with": 0.0033333333333333335,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    },
+    "0.1": {
+      "identity": {
+        "n": 300,
+        "failure": 0.02666666666666667,
+        "stopped": 0.09333333333333334,
+        "success_lost": 0.07333333333333333,
+        "unsafe_without": 0.01,
+        "unsafe_with": 0.0033333333333333335,
+        "p": 0.5
+      },
+      "blur-8@wrist": {
+        "n": 300,
+        "failure": 0.28,
+        "stopped": 0.44666666666666666,
+        "success_lost": 0.26,
+        "unsafe_without": 0.03,
+        "unsafe_with": 0.0,
+        "p": 0.00390625,
+        "p_holm": 0.01953125
+      },
+      "blur-8@agentview": {
+        "n": 300,
+        "failure": 0.11666666666666667,
+        "stopped": 0.19666666666666666,
+        "success_lost": 0.1,
+        "unsafe_without": 0.01,
+        "unsafe_with": 0.0033333333333333335,
+        "p": 0.5,
+        "p_holm": 1.0
+      },
+      "noise-128@wrist": {
+        "n": 300,
+        "failure": 0.2633333333333333,
+        "stopped": 0.42333333333333334,
+        "success_lost": 0.24,
+        "unsafe_without": 0.01,
+        "unsafe_with": 0.0,
+        "p": 0.25,
+        "p_holm": 1.0
+      },
+      "noise-128@agentview": {
+        "n": 300,
+        "failure": 0.14666666666666667,
+        "stopped": 0.25,
+        "success_lost": 0.13,
+        "unsafe_without": 0.0033333333333333335,
+        "unsafe_with": 0.0033333333333333335,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "target_occlusion@wrist": {
+        "n": 300,
+        "failure": 0.48333333333333334,
+        "stopped": 0.5566666666666666,
+        "success_lost": 0.17333333333333334,
+        "unsafe_without": 0.04666666666666667,
+        "unsafe_with": 0.006666666666666667,
+        "p": 0.00048828125,
+        "p_holm": 0.0029296875
+      },
+      "target_occlusion@agentview": {
+        "n": 300,
+        "failure": 0.056666666666666664,
+        "stopped": 0.18333333333333332,
+        "success_lost": 0.13,
+        "unsafe_without": 0.006666666666666667,
+        "unsafe_with": 0.0033333333333333335,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    }
+  },
+  "off_table_episodes": 0,
+  "timing": {
+    "unsafe_events": 32,
+    "caught_before_collision": 26,
+    "lead_steps_median": 70.0,
+    "lead_steps_range": [
+      9.0,
+      219.0
+    ],
+    "precision_for_failure": 0.5580865603644647,
+    "recall_of_failure": 0.6064356435643564,
+    "base_failure_rate": 0.22444444444444445,
+    "stop_step_median_failures": 96.0,
+    "average_precision": {
+      "instruction_effect": 0.20635991758310007,
+      "chunk_turn": 0.43077817220107706,
+      "horizon_decay": 0.2614233637487127,
+      "chunk_jump": 0.4537378609221022,
+      "speed": 0.12398079399296343
+    },
+    "base_rate_test": 0.1961904761904762
+  }
+}

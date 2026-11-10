@@ -1,0 +1,297 @@
+{
+  "published_success": 0.979,
+  "n_common": 500,
+  "replicates": [
+    {
+      "replicate": 0,
+      "dir": "results/baseline/identity-agentview+wrist__ins-own__rep0",
+      "n": 500,
+      "success": 492,
+      "rate": 0.984,
+      "wilson95": [
+        0.9687488914666058,
+        0.9918707469666117
+      ],
+      "published_inside_ci": true,
+      "errors_unresolved": [],
+      "per_task": {
+        "0": {
+          "n": 50,
+          "success": 49
+        },
+        "1": {
+          "n": 50,
+          "success": 48
+        },
+        "2": {
+          "n": 50,
+          "success": 50
+        },
+        "3": {
+          "n": 50,
+          "success": 47
+        },
+        "4": {
+          "n": 50,
+          "success": 50
+        },
+        "5": {
+          "n": 50,
+          "success": 50
+        },
+        "6": {
+          "n": 50,
+          "success": 50
+        },
+        "7": {
+          "n": 50,
+          "success": 50
+        },
+        "8": {
+          "n": 50,
+          "success": 49
+        },
+        "9": {
+          "n": 50,
+          "success": 49
+        }
+      }
+    },
+    {
+      "replicate": 1,
+      "dir": "results/baseline/identity-agentview+wrist__ins-own__rep1",
+      "n": 500,
+      "success": 492,
+      "rate": 0.984,
+      "wilson95": [
+        0.9687488914666058,
+        0.9918707469666117
+      ],
+      "published_inside_ci": true,
+      "errors_unresolved": [],
+      "per_task": {
+        "0": {
+          "n": 50,
+          "success": 49
+        },
+        "1": {
+          "n": 50,
+          "success": 48
+        },
+        "2": {
+          "n": 50,
+          "success": 50
+        },
+        "3": {
+          "n": 50,
+          "success": 47
+        },
+        "4": {
+          "n": 50,
+          "success": 50
+        },
+        "5": {
+          "n": 50,
+          "success": 50
+        },
+        "6": {
+          "n": 50,
+          "success": 50
+        },
+        "7": {
+          "n": 50,
+          "success": 50
+        },
+        "8": {
+          "n": 50,
+          "success": 49
+        },
+        "9": {
+          "n": 50,
+          "success": 49
+        }
+      }
+    }
+  ],
+  "accounting": [
+    {
+      "run_dir": "results/baseline/identity-agentview+wrist__ins-own__rep0",
+      "expected": 500,
+      "completed": 500,
+      "missing": 0,
+      "errored_only": 0,
+      "conflicts": 0,
+      "identical_duplicates": 0,
+      "unexpected": 0,
+      "sessions": 1,
+      "dirty_sessions": 0,
+      "foreign_stamps": 0,
+      "manifest_digest": null,
+      "commits": [
+        "9f71a6157b74c4abaaf703a0e31a3297b8c389a7"
+      ],
+      "complete": true
+    },
+    {
+      "run_dir": "results/baseline/identity-agentview+wrist__ins-own__rep1",
+      "expected": 500,
+      "completed": 500,
+      "missing": 0,
+      "errored_only": 0,
+      "conflicts": 0,
+      "identical_duplicates": 0,
+      "unexpected": 0,
+      "sessions": 1,
+      "dirty_sessions": 0,
+      "foreign_stamps": 0,
+      "manifest_digest": null,
+      "commits": [
+        "9f71a6157b74c4abaaf703a0e31a3297b8c389a7"
+      ],
+      "complete": true
+    }
+  ],
+  "noise_floor": {
+    "outcome_discordant": 0,
+    "discordance_wilson95": [
+      4.336808689942018e-19,
+      0.007624340461552241
+    ],
+    "mcnemar": {
+      "n": 500,
+      "n10": 0,
+      "n01": 0,
+      "p": 1.0,
+      "risk_diff": 0.0
+    },
+    "trajectory_differs": [
+      [
+        6,
+        9
+      ],
+      [
+        9,
+        19
+      ],
+      [
+        9,
+        38
+      ]
+    ],
+    "outcome_discordance_rate": 0.0
+  },
+  "failures_rep0": [
+    {
+      "task": 0,
+      "init": 38,
+      "steps": 300,
+      "goals_true": {},
+      "moved_m": {},
+      "max_force": {
+        "object": 0.0,
+        "environment": 46.771047201414426
+      },
+      "off_table": []
+    },
+    {
+      "task": 1,
+      "init": 27,
+      "steps": 300,
+      "goals_true": {
+        "7": 212
+      },
+      "moved_m": {
+        "akita_black_bowl_1": 0.065
+      },
+      "max_force": {
+        "object": 8.51179604394499,
+        "environment": 229.7037654026932
+      },
+      "off_table": []
+    },
+    {
+      "task": 1,
+      "init": 40,
+      "steps": 300,
+      "goals_true": {},
+      "moved_m": {
+        "akita_black_bowl_1": 0.117
+      },
+      "max_force": {
+        "object": 9.942900966905743,
+        "environment": 105.37485070698216
+      },
+      "off_table": []
+    },
+    {
+      "task": 3,
+      "init": 44,
+      "steps": 300,
+      "goals_true": {},
+      "moved_m": {
+        "akita_black_bowl_1": 0.101
+      },
+      "max_force": {
+        "object": 11.300574488169602,
+        "environment": 139.98310310401533
+      },
+      "off_table": []
+    },
+    {
+      "task": 3,
+      "init": 46,
+      "steps": 300,
+      "goals_true": {},
+      "moved_m": {},
+      "max_force": {
+        "object": 0.0,
+        "environment": 117.45728426902232
+      },
+      "off_table": []
+    },
+    {
+      "task": 3,
+      "init": 48,
+      "steps": 300,
+      "goals_true": {},
+      "moved_m": {
+        "akita_black_bowl_1": 0.199,
+        "cream_cheese_1": 0.026
+      },
+      "max_force": {
+        "object": 34.533080239735625,
+        "environment": 401.019518108214
+      },
+      "off_table": []
+    },
+    {
+      "task": 8,
+      "init": 41,
+      "steps": 300,
+      "goals_true": {},
+      "moved_m": {
+        "akita_black_bowl_1": 0.06,
+        "plate_1": 0.016
+      },
+      "max_force": {
+        "object": 15.704790802788427,
+        "environment": 42.59108753614918
+      },
+      "off_table": []
+    },
+    {
+      "task": 9,
+      "init": 27,
+      "steps": 300,
+      "goals_true": {},
+      "moved_m": {
+        "wine_bottle_1": 0.014
+      },
+      "max_force": {
+        "object": 21.44901817990427,
+        "environment": 154.38768259978158
+      },
+      "off_table": []
+    }
+  ]
+}

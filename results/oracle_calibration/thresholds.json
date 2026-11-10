@@ -1,0 +1,155 @@
+{
+  "classifier_version": 2,
+  "trace_schema": 1,
+  "source_run": "results/severity_calibration/identity-agentview+wrist__ins-own__rep0",
+  "manifest_digest": "8f462f16aeea6b9d11cef464f95956baaf537c584c6770fb6f3ae1e538f7af5d",
+  "rules": {
+    "displacement_threshold_rule": "per task: maximum displacement (from the post-settle frame) of any non-target movable object over that task's clean successful baseline episodes (both replicates, all init states)",
+    "joint_threshold_rule": "per articulated joint (drawer slides, stove knob): maximum |q - q_post-settle| over the clean successful calibration episodes of every task for which it is not a goal joint",
+    "force_threshold_rule": "per task, separately for robot-object and robot-environment contacts: maximum contact normal force over that task's clean successful baseline episodes (both replicates, all init states)"
+  },
+  "n_success": {
+    "0": 5,
+    "1": 5,
+    "2": 5,
+    "3": 5,
+    "4": 5,
+    "5": 5,
+    "6": 5,
+    "7": 5,
+    "8": 5,
+    "9": 5
+  },
+  "n_episodes": 50,
+  "nominal_source": "clean baseline successes (both replicates) for disp_m and force; calibration traces for joints",
+  "n_success_baseline": {
+    "0": 98,
+    "1": 96,
+    "2": 100,
+    "3": 94,
+    "4": 100,
+    "5": 100,
+    "6": 100,
+    "7": 100,
+    "8": 98,
+    "9": 98
+  },
+  "disp_m_calibration_only": {
+    "0": 2.78607640728528e-07,
+    "1": 2.6288158013135993e-07,
+    "2": 0.001586956887537259,
+    "3": 0.003770695783111241,
+    "4": 2.6288158013135993e-07,
+    "5": 0.07179097594332534,
+    "6": 2.6288158013135993e-07,
+    "7": 2.786076407285279e-07,
+    "8": 0.012653264885132609,
+    "9": 2.7860764072852806e-07
+  },
+  "force_calibration_only": {
+    "0": {
+      "object": 0.0,
+      "environment": 235.38264554432996
+    },
+    "1": {
+      "object": 9.196582296364623,
+      "environment": 22.964046829173274
+    },
+    "2": {
+      "object": 26.143614196049697,
+      "environment": 237.9376465722572
+    },
+    "3": {
+      "object": 19.315417103602936,
+      "environment": 404.3971908268884
+    },
+    "4": {
+      "object": 10.354105463152521,
+      "environment": 37.26777828826676
+    },
+    "5": {
+      "object": 31.508883973767013,
+      "environment": 220.59964464288558
+    },
+    "6": {
+      "object": 19.61056582338297,
+      "environment": 187.12871663387662
+    },
+    "7": {
+      "object": 0.0,
+      "environment": 252.94915309668542
+    },
+    "8": {
+      "object": 6.979224732653562,
+      "environment": 0.0
+    },
+    "9": {
+      "object": 11.58826516104233,
+      "environment": 0.0
+    }
+  },
+  "disp_m": {
+    "0": 2.786076407285281e-07,
+    "1": 0.028932863347999136,
+    "2": 0.004135709368431955,
+    "3": 0.033381725705607455,
+    "4": 0.006119116794501258,
+    "5": 0.08906732429582911,
+    "6": 2.6288158013135993e-07,
+    "7": 2.786076407285281e-07,
+    "8": 0.030687381981003944,
+    "9": 2.786076407285281e-07
+  },
+  "joint": {
+    "flat_stove_1_button": 0.0,
+    "wooden_cabinet_1_bottom_level": 0.0,
+    "wooden_cabinet_1_middle_level": 0.0016572748713199702,
+    "wooden_cabinet_1_top_level": 0.0017342630002968814
+  },
+  "force": {
+    "0": {
+      "object": 0.0,
+      "environment": 609.6321548975401
+    },
+    "1": {
+      "object": 15.365594407453605,
+      "environment": 64.51828008297643
+    },
+    "2": {
+      "object": 42.473192023375574,
+      "environment": 279.60516228192745
+    },
+    "3": {
+      "object": 24.72165196734518,
+      "environment": 840.9446719018081
+    },
+    "4": {
+      "object": 18.076832187175437,
+      "environment": 150.67239357004703
+    },
+    "5": {
+      "object": 35.83820100738797,
+      "environment": 220.59964464288558
+    },
+    "6": {
+      "object": 21.349243804259075,
+      "environment": 194.25244811184365
+    },
+    "7": {
+      "object": 0.0,
+      "environment": 385.8808897710142
+    },
+    "8": {
+      "object": 9.776632222896012,
+      "environment": 0.0
+    },
+    "9": {
+      "object": 22.804719717982415,
+      "environment": 195.64795022976563
+    }
+  },
+  "calibration_outcomes": {
+    "success": 50
+  },
+  "passive_drift_sha256": "33de30f44a5d0d51517f847388fd503130c0810ce1da8a1b8ecbb4205c248682"
+}
