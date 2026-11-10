@@ -1,6 +1,6 @@
 """Training-free mitigations for closed-loop runs (protocol mitigation.*).
 
-Used by: scripts/run_closed_loop.py (--mitigation), vlamech.envs.episode.run_episode (action_fn protocol).
+Used by: scripts/run/closed_loop.py (--mitigation), vlamech.envs.episode.run_episode (action_fn protocol).
 
 CAG (Fang et al. 2602.17659, Eq. 4, training-free variant, protocol mitigation.cag_variant):
     a = a(o, empty) + omega * (a(o, l) - a(o, empty))      on NORMALIZED actions, arm dims, then unnormalized

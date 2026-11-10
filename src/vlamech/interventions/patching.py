@@ -1,6 +1,6 @@
 """Activation patching on OFT: donor captures and patch construction (protocol patching.*).
 
-Used by: scripts/run_activation_patching.py, scripts/run_patching_rollouts.py, tests/test_patching.py.
+Used by: scripts/run/activation_patching.py, scripts/run/patching_rollouts.py, tests/test_patching.py.
 
 Points on the depth axis (protocol patching.layer_grid): "embed" = the input sequence to layer 0 (site "embed"), an
 integer l = the residual output of decoder layer l (site "resid"). Patching at a point replaces the token group's

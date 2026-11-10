@@ -1,6 +1,6 @@
 """pi0.5 (LeRobot, flow-matching action expert) policy wrapper with the interface the closed-loop runner uses.
 
-Used by: scripts/run_closed_loop.py (--policy pi05), tests/test_pi05.py. Runs only in the LeRobot environment
+Used by: scripts/run/closed_loop.py (--policy pi05), tests/test_pi05.py. Runs only in the LeRobot environment
 (env/setup_env_lerobot.sh); the OFT environment cannot import lerobot (different transformers build).
 
 Checkpoint: lerobot/pi05_libero_finetuned_v044 (trained on HuggingFaceVLA/libero = all four LIBERO suites, 256x256

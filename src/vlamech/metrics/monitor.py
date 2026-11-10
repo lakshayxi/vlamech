@@ -1,6 +1,6 @@
 """Online failure signals for the failure monitor and the safe stop (protocol mitigation.monitor_*).
 
-Used by: scripts/analyze_failure_monitor.py. Every signal at query q uses only commanded actions up to and including q, so it is
+Used by: scripts/analysis/failure_monitor.py. Every signal at query q uses only commanded actions up to and including q, so it is
 available before chunk q is executed.
   instruction_effect  |a(o, l) - a(o, empty)| over the normalized 8x6 arm chunk (one extra forward)
   chunk_turn          degrees between the last commanded translation of chunk q-1 and the first of chunk q

@@ -80,10 +80,10 @@ interval; this compares two released checkpoints, not two architectures.
 
 - Exploratory figures of the instruction effect and of closed-loop behaviour (`scripts/figures_*.py`).
 - Physical goal check: commanded progress toward the instructed destination on the bowl tasks
-  (`scripts/analyze_goal_progress.py`).
-- Steering loss against episode outcome (`scripts/analyze_steering_and_failure.py`).
-- Timing of the safe stop relative to the first collision (section of `scripts/analyze_failure_monitor.py`).
-- The wrong-destination label (`oracle.destination_label`) and the oracle review sheets (`scripts/review_sheet.py`).
+  (`scripts/analysis/goal_progress.py`).
+- Steering loss against episode outcome (`scripts/analysis/steering_and_failure.py`).
+- Timing of the safe stop relative to the first collision (section of `scripts/analysis/failure_monitor.py`).
+- The wrong-destination label (`oracle.destination_label`) and the oracle review sheets (`scripts/figures/oracle_review.py`).
 
 ## Release note
 

@@ -1,6 +1,6 @@
 """Statistics for paired, clustered robot-evaluation data.
 
-Used by: every analysis script (scripts/analyze_*.py).
+Used by: every analysis script (scripts/analysis/).
 
 Data structure assumed throughout: observations are nested  task -> episode (init state) -> step.
 Conditions are *paired* on (task, init_state), so contrasts are computed within pairs and uncertainty

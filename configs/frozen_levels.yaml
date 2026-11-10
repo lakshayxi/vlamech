@@ -1,5 +1,5 @@
 # Corruption levels and oracle thresholds frozen after calibration, before any held-out run.
-# Written once by scripts/freeze_levels.py, never edited.
+# Written once by scripts/calibration/freeze_levels.py, never edited.
 frozen: '2026-11-06T17:25:57'
 corruption:
   identity:

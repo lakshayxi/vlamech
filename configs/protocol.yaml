@@ -20,7 +20,7 @@ policy:
   global_seed: {value: 7, source: upstream,
                 why: "run_libero_eval seed; the L1 head samples nothing, so it only fixes library RNG state"}
 
-# Comparison policy, selected per run with run_closed_loop.py --policy pi05 (LeRobot environment).
+# Comparison policy, selected per run with scripts/run/closed_loop.py --policy pi05 (LeRobot environment).
 policies:
   pi05:
     family: {value: pi05, source: definitional, why: "LeRobot pi0.5: flow-matching action expert, sampled 50-action chunks"}
@@ -53,7 +53,7 @@ splits:
                 why: "init states 0-4 x 10 tasks = 50 episodes per level, for severity and threshold calibration"}
   exploratory: {value: [5, 19], source: rule, why: "method development: open-loop metrics, patching, monitor signals, mitigation selection"}
   confirmatory: {value: [20, 49], source: rule,
-                 why: "held out: 30 x 10 = 300 paired episodes per condition (scripts/power_analysis.py)"}
+                 why: "held out: 30 x 10 = 300 paired episodes per condition (scripts/calibration/power_analysis.py)"}
 
 instructions:
   wrong_instruction_rule: {value: "(task_id + 5) mod 10", source: convention,

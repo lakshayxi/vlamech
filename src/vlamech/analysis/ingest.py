@@ -1,6 +1,6 @@
 """Shared ingestion of closed-loop run directories for every analysis.
 
-Used by: scripts/analyze_baseline.py, scripts/analyze_instruction_reliance.py and every later analysis.
+Used by: scripts/analysis/baseline.py, scripts/analysis/instruction_reliance.py and every later analysis.
 
 load_run(run_dir, expected_keys) reads all episodes*.jsonl files of one run directory and returns a RunData with
 explicit accounting: expected / completed / missing / errored-only / conflicting-duplicate keys, plus the

@@ -1,4 +1,4 @@
-"""Episode table of an open-loop instruction-effect pass (scripts/run_instruction_effect.py output)."""
+"""Episode table of an open-loop instruction-effect pass (scripts/run/instruction_effect.py output)."""
 from __future__ import annotations
 
 from pathlib import Path

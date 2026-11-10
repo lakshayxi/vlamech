@@ -1,6 +1,6 @@
 """One model copy on the GPU serving many episode processes (throughput; frees GPU memory for other work).
 
-Used by: scripts/serve_policy.py (server), scripts/run_closed_loop.py --policy-server (clients), tests/test_policy_server.py.
+Used by: scripts/run/serve_policy.py (server), scripts/run/closed_loop.py --policy-server (clients), tests/test_policy_server.py.
 
 Why: one closed-loop process holds a full 7.5B model (~19 GB) and spends most of an episode in the simulator and
 renderer, so the GPU idles. Here the model is loaded once; any number of runner processes (each with its own

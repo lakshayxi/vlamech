@@ -1,6 +1,6 @@
 """Corruption-sweep episode table: every frozen condition through the frozen oracle, plus exploratory labels.
 
-Used by: scripts/analyze_corruption_sweep.py (confirmatory), scripts/figures_trajectories.py (exploratory figures).
+Used by: scripts/analysis/corruption_sweep.py (confirmatory), scripts/figures/trajectories.py (exploratory figures).
 
 build_table(root, partial) loads each condition with the strict ingestion (complete runs, clean code, manifest
 stamps, trace hashes), checks the oracle thresholds against the frozen hash, and returns one row per episode:

@@ -1,6 +1,6 @@
 """How much a background-only corruption reaches protected pixels of the model input.
 
-Used by: scripts/measure_preprocessing_leakage.py, tests/test_perturbations.py.
+Used by: scripts/analysis/preprocessing_leakage.py, tests/test_perturbations.py.
 
 Background-only families (bg_patches, matched_bg_box) leave every protected RAW pixel unchanged (tested). OFT's
 preprocessing (vlamech.models.oft.policy_view: JPEG round-trip with 4:2:0 chroma, 16x16 MCUs; Lanczos-3 resize

@@ -1,4 +1,4 @@
-# Written by scripts/download_models.py. Do not edit by hand.
+# Written by scripts/setup/download_models.py. Do not edit by hand.
 lerobot/pi05_libero_finetuned_v044:
   files:
     config.json: 2f6d4b96b032593e1de65b391ee7252a70227bff398ef1b94658fea17818142f

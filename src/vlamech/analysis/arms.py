@@ -1,6 +1,6 @@
 """Shared loading for the failure-monitor and mitigation analyses (protocol mitigation.*).
 
-Used by: scripts/analyze_mitigation.py, scripts/analyze_failure_monitor.py, scripts/run_monitor_and_mitigation.sh.
+Used by: scripts/analysis/mitigation.py, scripts/analysis/failure_monitor.py, scripts/run/monitor_and_mitigation.sh.
 
 Condition labels: "<family>[-<value>][@<camera>]", e.g. "identity", "blur-8", "target_occlusion@wrist".
 """

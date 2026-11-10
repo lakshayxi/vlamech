@@ -46,5 +46,5 @@ def test_hyperparameter_doc_is_current():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    r = subprocess.run([sys.executable, str(root / "scripts/render_protocol_doc.py"), "--check"], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, str(root / "scripts/setup/render_hyperparameters.py"), "--check"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr

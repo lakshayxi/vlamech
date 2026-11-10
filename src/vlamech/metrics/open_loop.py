@@ -1,6 +1,6 @@
-"""Open-loop instruction-effect metrics from the actions of scripts/run_instruction_effect.py (protocol metrics.*).
+"""Open-loop instruction-effect metrics from the actions of scripts/run/instruction_effect.py (protocol metrics.*).
 
-Used by: scripts/analyze_instruction_effect.py, tests/test_open_loop.py.
+Used by: scripts/analysis/instruction_effect.py, tests/test_open_loop.py.
 
 Input per episode: actions_norm (queries, conditions, instructions, 8, 7) with instruction 0 = own, 1..9 = the other
 tasks, last = "" (empty). Arm dims and chunk come from protocol metrics. All distances: Euclidean norm over the

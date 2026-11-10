@@ -1,6 +1,6 @@
 # Hyperparameters and design parameters
 
-*Generated from `configs/protocol.yaml` by `scripts/render_protocol_doc.py`. Do not edit by hand.*
+*Generated from `configs/protocol.yaml` by `scripts/setup/render_hyperparameters.py`. Do not edit by hand.*
 
 Every number used by the experiments is listed here with its category and justification.
 
@@ -56,7 +56,7 @@ Every number used by the experiments is listed here with its category and justif
 | `splits.n_init_states` | 50 | upstream | benchmark initial states per task |
 | `splits.calibration` | [0, 4] | rule | init states 0-4 x 10 tasks = 50 episodes per level, for severity and threshold calibration |
 | `splits.exploratory` | [5, 19] | rule | method development: open-loop metrics, patching, monitor signals, mitigation selection |
-| `splits.confirmatory` | [20, 49] | rule | held out: 30 x 10 = 300 paired episodes per condition (scripts/power_analysis.py) |
+| `splits.confirmatory` | [20, 49] | rule | held out: 30 x 10 = 300 paired episodes per condition (scripts/calibration/power_analysis.py) |
 
 ## `instructions`
 

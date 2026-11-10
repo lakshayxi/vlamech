@@ -1,6 +1,6 @@
 """Severity selection (protocol corruption.selection_rule, corruption.targets).
 
-Used by: scripts/analyze_severity_calibration.py. Pure functions, tested in tests/test_selection.py.
+Used by: scripts/analysis/severity_calibration.py. Pure functions, tested in tests/test_selection.py.
 
 Rule, per family: isotonic (monotone non-increasing) regression of success on ladder index, weighted by episodes
 (pool-adjacent-violators); relative success = fitted / clean success. For each target r, the level whose fitted

@@ -64,7 +64,7 @@ def protocol(dotted: str) -> Any:
 def frozen(dotted: str | None = None) -> Any:
     """The frozen selection (configs/frozen_levels.yaml), or one entry of it."""
     if not FROZEN_LEVELS.exists():
-        raise FileNotFoundError(f"{FROZEN_LEVELS} missing: run the severity calibration and scripts/freeze_levels.py first")
+        raise FileNotFoundError(f"{FROZEN_LEVELS} missing: run the severity calibration and scripts/calibration/freeze_levels.py first")
     node: Any = yaml.safe_load(FROZEN_LEVELS.read_text())
     for part in (dotted.split(".") if dotted else []):
         node = node[part]
@@ -80,5 +80,5 @@ def model_revision(repo_id: str) -> str:
     """Pinned commit of a model repo (configs/models.lock.yaml); models never load from an unpinned 'main'."""
     lock = _load("models.lock.yaml") or {}
     if repo_id not in lock:
-        raise KeyError(f"{repo_id} not pinned in configs/models.lock.yaml: run scripts/download_models.py")
+        raise KeyError(f"{repo_id} not pinned in configs/models.lock.yaml: run scripts/setup/download_models.py")
     return lock[repo_id]["revision"]

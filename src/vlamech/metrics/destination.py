@@ -1,6 +1,6 @@
 """Exploratory destination label (configs/protocol.yaml -> oracle.destination_label).
 
-Used by: scripts/figures_trajectories.py, tests/test_destination.py.
+Used by: scripts/figures/trajectories.py, tests/test_destination.py.
 
 Oracle v2 (vlamech.metrics.outcome) calls a failure intent loss only when another task's goal predicate becomes true
 or a non-target object moves first. Carrying the RIGHT object toward ANOTHER task's destination and failing to place

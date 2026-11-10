@@ -1,6 +1,6 @@
 """Rollout videos: what happened in the scene next to exactly what the network received.
 
-Used by: scripts/run_closed_loop.py (--record-video), scripts/make_rollout_videos.py.
+Used by: scripts/run/closed_loop.py (--record-video).
 
 One video frame per control step (20 Hz, played in real time), three panels:
   scene         the third-person camera as a person would see it: the policy-orientation frame flipped

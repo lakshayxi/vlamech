@@ -2,7 +2,7 @@
 state only, so outcome thresholds can be calibrated and applied AFTER collection.
 
 Used by: vlamech.envs.episode.run_episode (records), vlamech.metrics.outcome (classifies),
-scripts/calibrate_oracle.py (thresholds).
+scripts/calibration/oracle_thresholds.py (thresholds).
 
 Row r of every array = the state after r policy control steps; row 0 = the post-settle frame the first action
 is computed from (so goals already true before the policy acted are visible, and are not counted as events).

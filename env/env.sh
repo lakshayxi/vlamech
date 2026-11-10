@@ -7,7 +7,7 @@ export VLA_PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VLA_CACHE="${VLA_CACHE:-$VLA_PROJECT_ROOT/.cache}"
 export VLA_ENV_PREFIX="${VLA_ENV_PREFIX:-$VLA_PROJECT_ROOT/.envs/vlamech}"
 
-# Model and data caches. Runs never download: models are fetched once by scripts/download_models.py.
+# Model and data caches. Runs never download: models are fetched once by scripts/setup/download_models.py.
 export HF_HOME="${HF_HOME:-$VLA_CACHE/huggingface}"
 export HF_HUB_OFFLINE=1
 export HF_HUB_DISABLE_TELEMETRY=1

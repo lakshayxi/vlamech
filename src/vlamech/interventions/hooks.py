@@ -1,6 +1,6 @@
 """Activation capture and intervention hooks on the OFT language model.
 
-Used by: scripts/run_patching.py, scripts/run_open_loop.py (monitor features), tests.
+Used by: vlamech.interventions.patching, tests/test_hooks.py.
 
 Sites (all per decoder layer `l`, 0-based):
   "resid"  - output hidden state of decoder layer l (== hidden_states[l+1] in HF output)

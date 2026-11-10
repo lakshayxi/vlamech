@@ -1,13 +1,13 @@
 """Versioned closed-loop outcome classifier (protocol oracle.outcome_classifier).
 
-Used by: scripts/calibrate_oracle.py and the closed-loop analyses. Input: an oracle trace (vlamech.envs.trace), the INTENDED
+Used by: scripts/calibration/oracle_thresholds.py and the closed-loop analyses. Input: an oracle trace (vlamech.envs.trace), the INTENDED
 task (the prompted one; for wrong-instruction probes not the loaded one) and thresholds frozen by the protocol
 rules (oracle.displacement_threshold_rule, oracle.joint_threshold_rule). Nothing here reads the simulator.
 
 Events (first trace row r >= 1 at which they hold; row 0 is the post-settle frame, so a predicate or
 displacement that already holds there is not an event). An object counts as displaced only beyond
 max(disp_m, its passive-drift floor) and a joint beyond max(joint threshold, its floor) (v2: the floors are the
-motion with no robot action at all, scripts/measure_passive_drift.py; v1 had no floors and counted a target's own
+motion with no robot action at all, scripts/calibration/passive_drift.py; v1 had no floors and counted a target's own
 post-settle drift as progress when the task threshold was at that scale):
   goal_onset[t]     goal of task t false at row r-1 and true at row r
   target_progress   earliest of: a manipulated object displaced > disp_m from row 0; a goal joint moved

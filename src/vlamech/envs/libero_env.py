@@ -17,7 +17,7 @@ Differs from upstream, on purpose:
   * fixture layout made order-independent: LIBERO re-samples the poses of fixed bodies (cabinet, stove, rack)
     on every reset, and they live in the MuJoCo model, not in the state, so upstream's episode k sees the
     layout of reset k+1 of a seed-0 env. reset(k) restores exactly that layout from
-    assets/fixture_layouts_<suite>.npz (scripts/build_fixture_layouts.py; bit-exactness tested)
+    assets/fixture_layouts_<suite>.npz (scripts/setup/build_fixture_layouts.py; bit-exactness tested)
 """
 from __future__ import annotations
 
@@ -157,7 +157,7 @@ class LiberoTaskEnv:
     def _load_layouts(self) -> dict:
         path = Path(__file__).resolve().parents[3] / "assets" / f"fixture_layouts_{self.suite_name}.npz"
         if not path.exists():
-            raise FileNotFoundError(f"{path} missing: run scripts/build_fixture_layouts.py")
+            raise FileNotFoundError(f"{path} missing: run scripts/setup/build_fixture_layouts.py")
         z = np.load(path)
         m = self.inner.sim.model
         names = [str(n) for n in z["body_names"]]
