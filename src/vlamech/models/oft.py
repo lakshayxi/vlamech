@@ -67,7 +67,7 @@ class TokenLayout:
     `readout` = the 56 positions whose last-layer states the action head reads. OFT keeps the causal-LM
         label shift (finetune.py: hidden[:, num_patches:-1] with shifted label masks; predict_action:
         slice from NUM_PATCHES + NUM_PROMPT_TOKENS), so readout = [last prompt token, slots 0..54]:
-        one position BEFORE each slot. Slot 55 and the stop token are never read.
+        one position before each slot. Slot 55 and the stop token are never read.
     """
 
     seq_len: int

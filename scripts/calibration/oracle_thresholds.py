@@ -9,7 +9,7 @@ baseline (both replicates, records). Rules (configs/protocol.yaml oracle.*), app
   joint[j]         max |q_j - q_j(post-settle)| over the successful episodes of every task for which j is not a
                    goal joint
   force[task]      max robot-object and max robot-environment contact force over that task's clean baseline successes
-  floors           passive drift of the SAME task and init state with no robot action
+  floors           passive drift of the same task and init state with no robot action
                    (results/oracle_calibration/passive_drift.json, scripts/calibration/passive_drift.py); an object / joint
                    counts as moved only beyond max(threshold, floor) (classifier v2)
 A task without a successful calibration episode has no threshold: the script refuses (nothing is imputed).
@@ -33,14 +33,14 @@ from vlamech.envs.trace import TRACE_SCHEMA  # noqa: E402
 from vlamech.metrics.outcome import CLASSIFIER_VERSION, Thresholds, classify  # noqa: E402
 from vlamech.utils.io import atomic_write_bytes, atomic_write_json, file_sha256, read_json  # noqa: E402
 
-STAGE = ROOT / "results" / "severity_calibration"
+RUNS = ROOT / "results" / "severity_calibration"
 OUT = ROOT / "results" / "oracle_calibration"
 
 
 def main():
     states = split_states("calibration")
     tasks = range(10)
-    rd = load_run(find_run(STAGE, "identity-*__ins-own__rep0"), grid(tasks, states)).require_complete()
+    rd = load_run(find_run(RUNS, "identity-*__ins-own__rep0"), grid(tasks, states)).require_complete()
     traces = {k: trace(rd, k) for k in sorted(rd.records)}
     ok = {k for k, r in rd.records.items() if r["success"]}
     no_success = [t for t in tasks if not any(k[0] == t for k in ok)]

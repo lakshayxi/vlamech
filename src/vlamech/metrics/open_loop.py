@@ -113,7 +113,7 @@ def episode_values(acts: np.ndarray, clean: int) -> dict:
 
 
 def intent_similarity(acts: np.ndarray, clean: int) -> np.ndarray:
-    """(queries, conditions, 10): -distance of each condition's own-instruction action to the CLEAN action under each
+    """(queries, conditions, 10): -distance of each condition's own-instruction action to the clean action under each
     of the 10 task instructions (index 0 = own task). argmax = the task the action looks like (intent ribbon)."""
     x = _arm(acts)
     return -np.linalg.norm(x[:, :, :1] - x[:, clean][:, None, :-1], axis=-1)

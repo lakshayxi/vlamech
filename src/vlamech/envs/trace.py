@@ -1,5 +1,5 @@
 """Per-control-step oracle traces: everything the outcome classifier needs, from simulator
-state only, so outcome thresholds can be calibrated and applied AFTER collection.
+state only, so outcome thresholds can be calibrated and applied after collection.
 
 Used by: vlamech.envs.episode.run_episode (records), vlamech.metrics.outcome (classifies),
 scripts/calibration/oracle_thresholds.py (thresholds).

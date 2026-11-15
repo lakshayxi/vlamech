@@ -5,7 +5,7 @@ Usage:  python scripts/figures/instruction_effect.py [--data-root DIR] [--pass N
 
 Input: the open-loop pass `results/instruction_effect/<pass>` (default: the exploratory pass) and its pre-registered summary.json
 (scripts/analysis/instruction_effect.py), for the cell intervals. Per captured state: log IER per condition (vlamech.metrics.open_loop).
-Phase of a state, from the CLEAN own-instruction gripper command at that state. The gripper dimension is not
+Phase of a state, from the clean own-instruction gripper command at that state. The gripper dimension is not
 normalized (dataset_statistics action.mask[6] = False): it stays in [0, 1], 1 = open, 0 = closed, and upstream
 binarizes it at 0.5 (robot_utils.normalize_gripper_action: 2x - 1, then sign); chunk mean < 0.5 = closing.
 Phases: approach (before the first closing chunk), carry (closing), release (open again after a carry). Tasks 0 and 5

@@ -60,7 +60,7 @@ def task_entities(parsed: dict) -> set[str]:
 
 
 def quat2axisangle(quat: np.ndarray) -> np.ndarray:
-    """Copy of robosuite's conversion (as used upstream) that does NOT modify its argument."""
+    """Copy of robosuite's conversion (as used upstream) that does not modify its argument."""
     q = np.array(quat, dtype=np.float64, copy=True)
     q[3] = min(max(q[3], -1.0), 1.0)
     den = np.sqrt(1.0 - q[3] * q[3])
@@ -147,7 +147,7 @@ class LiberoTaskEnv:
         self._goal_states = {i: p["goal_state"] for i, p in self._parsed.items()}
         own = self._parsed[task_id]
         self.movable_objects = sorted(n for names in own["objects"].values() for n in names)
-        # Union over ALL suite tasks: a "background" perturbation must not hide any task's candidate target,
+        # Union over all suite tasks: a "background" perturbation must not hide any task's candidate target,
         # otherwise measured intent substitution would depend on which objects happened to stay visible.
         self.protected_entities = sorted(set().union(*(task_entities(p) for p in self._parsed.values())))
         self.own_entities = sorted(task_entities(own))
@@ -434,7 +434,7 @@ class LiberoTaskEnv:
 
     def instance_ids(self) -> dict[str, int]:
         """Instance name -> id in the instance-segmentation image: enumeration index + 1 (0 = no instance),
-        LIBERO's convention. Computed here for EVERY instance, because LIBERO's own mapping looks for a robot
+        LIBERO's convention. Computed here for every instance, because LIBERO's own mapping looks for a robot
         named "Panda0", which tabletop scenes call "MountedPanda0": it then maps the arm like an object and
         leaves the mount and gripper unmapped. Pixel-level correctness is tested in tests/test_libero_env.py."""
         return {name: i + 1 for i, name in enumerate(self._instances())}

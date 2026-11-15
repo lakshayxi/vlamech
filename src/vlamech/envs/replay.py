@@ -17,7 +17,7 @@ the benchmark scene), bddl_sha256 (the loaded problem file), schema.
 Open-loop analyses use the captured frames directly (no re-rendering): they are the only exact replay.
 
 Why a state vector cannot replay an observation (measured in tests/test_trace.py):
-  * robosuite samples observables at the FIRST of the 25 physics substeps of a control step (no delay configured),
+  * robosuite samples observables at the first of the 25 physics substeps of a control step (no delay configured),
     so the frame and proprio a policy receives describe the state ~48 ms before the end-of-step simulator state;
     re-rendering the saved end-of-step state differs (e.g. 0.24 mm proprio, 167 px, already at the post-settle frame)
   * the OSC controller's internal state and the solver warm start are not in the state vector, so re-executing the

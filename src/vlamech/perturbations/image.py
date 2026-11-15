@@ -1,7 +1,7 @@
 """Observation-level image corruptions.
 
 All functions are pure (never modify their input; tested) and deterministic given their seed keys.
-Images are uint8 HxWx3 *camera frames* after the 180-degree flip of the OFT pipeline and BEFORE the
+Images are uint8 HxWx3 *camera frames* after the 180-degree flip of the OFT pipeline and before the
 policy's own preprocessing (JPEG round-trip, resize, crop), which is applied afterwards unchanged.
 Corrupting the raw frame models a camera-side change.
 
@@ -12,10 +12,10 @@ result records exactly what was applied:
   noise             Gaussian pixel std (0-255)          resampled every control step (sensor noise)
   blur              Gaussian sigma in pixels            defocus
   jpeg              JPEG quality (1-100)                compression artifacts
-  bg_patches        fraction of background covered     composited BEHIND the foreground via segmentation,
+  bg_patches        fraction of background covered     composited behind the foreground via segmentation,
                                                         so never covers robot/objects (task-irrelevant by construction)
   target_occlusion  value ignored                       tight box over the instructed target (task-relevant control)
-  matched_bg_box    value ignored                       gray box of the SAME size as the current target box, placed
+  matched_bg_box    value ignored                       gray box of the same size as the current target box, placed
                                                         entirely on background (area-matched irrelevant control)
 
 Common random numbers: draws are keyed by (family, episode, camera[, step]), never by the value, so every
@@ -57,7 +57,7 @@ class CorruptionSpec:
     family: str = "identity"
     value: Optional[float] = None  # physical parameter; None for identity / target_occlusion
     cameras: tuple[str, ...] = ("agentview", "wrist")
-    # exact-model-input variant: composite AFTER the OFT preprocessing, so protected model-input pixels equal the
+    # exact-model-input variant: composite after the OFT preprocessing, so protected model-input pixels equal the
     # clean ones exactly (vlamech.perturbations.leakage.exact_model_input_views); background-only families only
     exact_model_input: bool = False
 

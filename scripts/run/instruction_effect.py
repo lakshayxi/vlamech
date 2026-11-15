@@ -3,7 +3,7 @@
 Usage:  python scripts/run/instruction_effect.py --source <run dir with clean captures> [--policy-server SOCKET] [--shard i/n]
   -> results/instruction_effect/<source run name>/<task>-<init>.npz  (+ manifest.shard<i>of<n>.json, one entry per start)
 
-For each captured query k of a CLEAN run (the state the policy was in, its raw frames, proprio and masks), for each
+For each captured query k of a clean run (the state the policy was in, its raw frames, proprio and masks), for each
 condition of configs/frozen_levels.yaml: the corruption is re-created exactly as the closed loop would have applied it
 at that state and step (same EpisodeCorruptor key and step, captured masks; exact-model-input composited after
 preprocessing), then the policy gives its action chunk for the instructed task, the 9 other tasks

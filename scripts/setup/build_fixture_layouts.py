@@ -2,7 +2,7 @@
 
 Usage:  python scripts/setup/build_fixture_layouts.py   -> assets/fixture_layouts_libero_goal.npz
 
-Why: LIBERO re-samples the placement of FIXED bodies
+Why: LIBERO re-samples the placement of fixed bodies
 (cabinet, stove, wine rack) on every env.reset(). Their positions live in the MuJoCo *model* (body_pos /
 body_quat), not in the simulator state, so `set_init_state` does not restore them. Upstream evaluation
 (run_libero_eval.py) creates one env per task, seeds it with 0, and runs init states 0..49 in order, so the

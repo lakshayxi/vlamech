@@ -63,7 +63,7 @@ def hierarchical_bootstrap(
 ) -> dict:
     """Percentile CI by resampling clusters with replacement, optionally within fixed strata.
 
-    strata: columns whose units are FIXED (every stratum appears exactly once in every replicate).
+    strata: columns whose units are fixed (every stratum appears exactly once in every replicate).
         LIBERO tasks are a fixed set, not a sample from a population of tasks, so the primary analysis
         stratifies by task.
     levels: columns resampled with replacement, outermost first, nested inside the strata. The primary

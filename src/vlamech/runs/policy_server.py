@@ -6,7 +6,7 @@ Why: one closed-loop process holds a full 7.5B model (~19 GB) and spends most of
 renderer, so the GPU idles. Here the model is loaded once; any number of runner processes (each with its own
 simulator, on its own CPU core) send their queries to it over a local socket.
 
-Exactness: the server answers requests ONE AT A TIME with exactly the calls the runner would make in-process
+Exactness: the server answers requests one at a time with exactly the calls the runner would make in-process
 (policy.prepare + policy.forward, policy.act_many), on the same inputs, with batch size 1. Nothing is batched, so an
 action computed through the server is the action the in-process policy computes (tested against in-process calls,
 tests/test_policy_server.py; GPU parity in the same file). The client checks at connect time that the server holds

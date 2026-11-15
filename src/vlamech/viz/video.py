@@ -69,7 +69,7 @@ class RolloutVideo:
         d = ImageDraw.Draw(canvas)
         panels = [(np.ascontiguousarray(frame.agentview[:, ::-1]), "scene (true camera view)"),
                   (self._seen["agentview"], "robot input: third-person"),
-                  (self._seen["wrist"], "robot input: wrist" if "wrist" in self.inputs else "wrist (NOT a model input)")]
+                  (self._seen["wrist"], "robot input: wrist" if "wrist" in self.inputs else "wrist (not a model input)")]
         for k, (img, label) in enumerate(panels):
             x = GAP + k * (PANEL + GAP)
             if img is not None:

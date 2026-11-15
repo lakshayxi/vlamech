@@ -2,7 +2,7 @@
 
 Used by: scripts/analysis/preprocessing_leakage.py, tests/test_perturbations.py.
 
-Background-only families (bg_patches, matched_bg_box) leave every protected RAW pixel unchanged (tested). OFT's
+Background-only families (bg_patches, matched_bg_box) leave every protected raw pixel unchanged (tested). OFT's
 preprocessing (vlamech.models.oft.policy_view: JPEG round-trip with 4:2:0 chroma, 16x16 MCUs; Lanczos-3 resize
 256->224; 90%-area centre crop resized back with bilinear interpolation) mixes neighbouring pixels, so model-input
 pixels near the protected/background boundary can change. This module measures that, never changes it.

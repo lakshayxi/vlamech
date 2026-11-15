@@ -23,14 +23,14 @@ from vlamech.metrics.stats import wilson_ci  # noqa: E402
 from vlamech.perturbations.image import LADDER_KEY, CorruptionSpec, ladder  # noqa: E402
 from vlamech.utils.io import atomic_write_bytes, atomic_write_json  # noqa: E402
 
-STAGE = ROOT / "results" / "severity_calibration"
+RUNS = ROOT / "results" / "severity_calibration"
 FIG = ROOT / "results" / "figures" / "severity_calibration"
 UNITS = {"photometric": "stops darker", "noise": "noise σ (0-255)", "blur": "blur σ (px)", "jpeg": "JPEG quality",
          "bg_patches": "background coverage"}
 
 
 def load(tag: str, keys: set):
-    rd = load_run(find_run(STAGE, f"{tag}__ins-own__rep0"), keys).require_complete()
+    rd = load_run(find_run(RUNS, f"{tag}__ins-own__rep0"), keys).require_complete()
     return sum(bool(r["success"]) for r in rd.records.values()), len(rd.records), rd
 
 
@@ -55,7 +55,7 @@ def main():
         if sel["top_above_lowest_target"]:
             nxt = next_level(levels, ext[fam]["spacing"], ext[fam]["bound"])
             extension = nxt if nxt is not None else "none possible (physical bound)"
-            ext_runs = list(STAGE.glob(f"{CorruptionSpec(fam, nxt).tag}__ins-own__rep0")) if nxt is not None else []
+            ext_runs = list(RUNS.glob(f"{CorruptionSpec(fam, nxt).tag}__ins-own__rep0")) if nxt is not None else []
             if ext_runs:  # the rule's one-step extension was run: select again on the extended ladder
                 k, n, _ = load(CorruptionSpec(fam, nxt).tag, keys)
                 levels = levels + [nxt]
@@ -75,8 +75,8 @@ def main():
         if sel["extension"] is not None:
             lines.append(f"Ladder extension (rule): {sel['extension']}")
         lines.append("")
-    atomic_write_json(STAGE / "summary.json", out)
-    atomic_write_bytes(STAGE / "summary.md", ("\n".join(lines) + "\n").encode())
+    atomic_write_json(RUNS / "summary.json", out)
+    atomic_write_bytes(RUNS / "summary.md", ("\n".join(lines) + "\n").encode())
     figure(out)
     print("\n".join(lines))
 

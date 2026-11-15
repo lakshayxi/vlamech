@@ -81,7 +81,7 @@ class RunHandle:
         return self.run_dir / ("episodes.jsonl" if self.shard_n == 1 else f"episodes.shard{self.shard_i}of{self.shard_n}.jsonl")
 
     def done_keys(self) -> set:
-        """Keys finished in ANY shard file (safe: other shards of the current topology only add their own keys)."""
+        """Keys finished in any shard file (safe: other shards of the current topology only add their own keys)."""
         return {(r["task_id"], r["init_state"]) for f in sorted(self.run_dir.glob("episodes*.jsonl"))
                 for r in read_jsonl(f) if r.get("error") is None}
 

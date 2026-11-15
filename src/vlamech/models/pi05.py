@@ -9,7 +9,7 @@ env/setup_env_lerobot.sh. Every input/output convention is LeRobot's own LIBERO 
 (src/lerobot/scripts/lerobot_eval.py `rollout`), reproduced by CALLING LeRobot's code wherever possible:
 
   observation    lerobot/envs/libero.py LiberoEnv._format_raw_obs: raw robosuite images "agentview_image" -> image,
-                 "robot0_eye_in_hand_image" -> image2 (NOT rotated there); robot_state = eef pos, eef quat (xyzw),
+                 "robot0_eye_in_hand_image" -> image2 (not rotated there); robot_state = eef pos, eef quat (xyzw),
                  gripper qpos. We hand LeRobot the raw (un-rotated) frames: our Frame images are rotated 180 deg
                  (vlamech.envs.libero_env), so they are rotated back ([::-1, ::-1], exact) before LeRobot's steps.
   -> tensors     lerobot/envs/utils.py preprocess_observation: uint8 HWC -> float32 CHW in [0, 1]
@@ -25,7 +25,7 @@ env/setup_env_lerobot.sh. Every input/output convention is LeRobot's own LIBERO 
                  noise (B, chunk_size=50, max_action_dim=32) with num_inference_steps=10 Euler steps; actions
                  truncated to 7 dims
   -> policy post checkpoint policy_postprocessor.json: MEAN_STD unnormalization (env-space actions; the gripper is
-                 continuous in robosuite's [-1, 1] convention, NOT OFT's [0, 1] -> binarize -> invert; the runner
+                 continuous in robosuite's [-1, 1] convention, not OFT's [0, 1] -> binarize -> invert; the runner
                  therefore steps the env with raw actions, LiberoTaskEnv.step(raw=True))
   execution      select_action's queue: the first n_action_steps actions of each 50-action chunk are executed open
                  loop before the next query (modeling_pi05.py PI05Policy.select_action). n_action_steps = 10, the
