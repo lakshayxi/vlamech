@@ -46,7 +46,7 @@ def parse_args(argv=None):
     ap.add_argument("--experiment", required=True, choices=sorted(experiments.EXPERIMENTS))
     ap.add_argument("--policy", default="oft", choices=experiments.POLICIES)
     ap.add_argument("--states", required=True, help="calibration | exploratory | confirmatory | all | a-b")
-    ap.add_argument("--tasks", default="0-9", help="a-b")
+    ap.add_argument("--tasks", default="0-9", help="a-b or a comma list of values and ranges, e.g. 1,2,4,6,8,9")
     ap.add_argument("--family", default="identity")
     ap.add_argument("--value", type=float, default=None)
     ap.add_argument("--cameras", default="agentview,wrist")
@@ -75,10 +75,13 @@ def _range(text: str, n: int) -> list[int]:
         return split_states(text)
     if text == "all":
         return list(range(n))
-    lo, hi = (int(x) for x in text.split("-"))
-    if not 0 <= lo <= hi < n:
-        raise ValueError(f"range {text} outside 0-{n - 1}")
-    return list(range(lo, hi + 1))
+    out = []
+    for part in text.split(","):  # "a-b" ranges and single values, comma separated
+        lo, hi = (int(x) for x in part.split("-")) if "-" in part else (int(part), int(part))
+        if not 0 <= lo <= hi < n:
+            raise ValueError(f"range {part} outside 0-{n - 1}")
+        out += [i for i in range(lo, hi + 1) if i not in out]
+    return sorted(out)
 
 
 def instruction_for(mode: str, task_id: int, suite) -> str:
