@@ -18,6 +18,11 @@ For the object, arm and gripper edits the readout positions' mean state at the p
 Patching (pregrasp and transport): single-point patches of the conflicting source's, the instruction's and the readout
 positions with the real run's states, at the points of sensor_conflict.patch_grid.
 Every forward is batch 1 (exact; batching changes bf16 results).
+
+--patch-stale (held-out episodes already in results/sensor_conflict/confirmatory/): at pregrasp and transport, for each
+single-source delay conflict (only that source from the previous query, 0.4 s old), single-point patches of that
+source's, the instruction's and the readout positions with the current observation's states
+  -> results/sensor_conflict/patching_stale/<task>-<init>.npz
 """
 from __future__ import annotations
 
@@ -194,12 +199,38 @@ def episode(env, policy, cap: dict, acts: np.ndarray, key: str, instruction: str
     return arrays, meta
 
 
+def patch_stale(policy, src, out: Path, keys: list, grid: list, suite):
+    out.mkdir(parents=True, exist_ok=True)
+    for n, key in enumerate(keys):
+        path = out / f"{key}.npz"
+        if path.exists():
+            continue
+        t = int(key[4:].split("-")[0])
+        cap = load_capture(src / "captures" / f"{key}.npz")
+        phases = phase_queries(np.load(src / "actions" / f"{key}.npz")["actions_norm"])
+        q = Queries(policy, suite.get_task(t).language)
+        arrays = {}
+        for ph in PATCH_PHASES:
+            k = phases[ph]
+            now = (cap["agentview"][k], cap["wrist"][k], cap["proprio"][k])
+            prev = (cap["agentview"][k - 1], cap["wrist"][k - 1], cap["proprio"][k - 1])
+            arrays[f"{ph}__now"] = q.act(*now)[0]
+            for m, source in enumerate(SOURCES3):
+                mixed = list(now)
+                mixed[m] = prev[m]
+                arrays[f"{ph}__mixed__{source}"] = q.act(*mixed)[0]
+                arrays[f"{ph}__patch__{source}"] = patch_curves(policy, q, now, tuple(mixed), source, grid)
+        atomic_write_npz(path, **arrays)
+        print(f"[patch_stale] {key} ({n + 1}/{len(keys)})", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--split", choices=("exploratory", "confirmatory"), required=True)
     ap.add_argument("--shard", default="0/1")
     ap.add_argument("--limit", type=int, default=None, help="first N episodes only (development)")
     ap.add_argument("--no-patching", action="store_true")
+    ap.add_argument("--patch-stale", action="store_true", help="patching of the delay conflicts only (see above)")
     a = ap.parse_args()
     si, sn = (int(x) for x in a.shard.split("/"))
     src = ROOT / protocol("sensor_conflict.captures")[a.split]
@@ -234,6 +265,10 @@ def main():
     repo = protocol("policy.checkpoint")
     model = identity.verify_model_files(repo)
     policy = OFTPolicy(repo, revision=model["revision"], center_crop=protocol("policy.center_crop"))
+    if a.patch_stale:
+        done = {f.stem for f in (OUT / "confirmatory").glob("task*-init*.npz")}
+        patch_stale(policy, src, OUT / "patching_stale", [k for k in keys if k in done], grid, suite)
+        return
     envs = {}
     print(f"[sensor_conflict] {a.split}: {len(keys)} episodes", flush=True)
     for n, key in enumerate(keys):
