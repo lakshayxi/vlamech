@@ -20,6 +20,13 @@ because the phase triggers read object and hand positions from the simulator (ne
                   frame shows the scene as it is now; a recovery that uses only frames that have arrived. Holding
                   doubles the time, so the episode gets twice the step budget (step_factor)
   delay_8_wait    the same for delay_8: every source 0.4 s late, the robot holds still for 8 steps before every query
+Mitigations of the late wrist camera that use only data that has arrived (the wrist frame of the previous query; fresh
+proprio and the camera pose that forward kinematics gives from it):
+  lag_wrist_waitopen  hold still before a query only while the fresh finger reading says the gripper is open (before the
+                      grasp); move freely once it has closed
+  lag_wrist_slow      every commanded motion halved, so the late frame is half as far behind; twice the step budget
+  lag_wrist_warp      the late wrist frame reprojected to the current camera pose, assuming every pixel lies on the
+                      table plane; the gripper's own pixels (assets/wrist_gripper_mask.npz) are kept as they are
 """
 from __future__ import annotations
 
@@ -36,11 +43,16 @@ NEAR_M = 0.15
 FREEZE_QUERIES = 2
 GRIP_CLOSED_BELOW = 0.5
 FAULTS = ("none", "proprio_offset", "gripper_stuck", "lag_agentview", "lag_wrist", "lag_proprio", "lag_all",
-          "lag_wrist_wait")
+          "lag_wrist_wait", "lag_wrist_waitopen", "lag_wrist_slow", "lag_wrist_warp")
+WRIST_LAGS = ("lag_wrist", "lag_wrist_wait", "lag_wrist_waitopen", "lag_wrist_slow", "lag_wrist_warp")
+OPEN_ABOVE = 0.04  # finger gap (m) above which the gripper counts as open
+SLOW = 0.5
+TABLE_Z = 0.92  # table plane for the warp (m); fitted on calibration frames of random hand motion
+WRIST_CAM = "robot0_eye_in_hand"
 PHASE_FAULTS = ("freeze_approach", "freeze_grasp", "freeze_transport", "freeze_place")
 DELAY_STEPS = (2, 4, 8, 16)  # 0.1, 0.2, 0.4, 0.8 s at 20 Hz
 DELAY_FAULTS = tuple(f"delay_{k}" for k in DELAY_STEPS) + ("delay_8_wait",)
-WAIT_FAULTS = ("lag_wrist_wait", "delay_8_wait")
+WAIT_FAULTS = ("lag_wrist_wait", "delay_8_wait", "lag_wrist_waitopen", "lag_wrist_slow")
 
 
 class SensorFault:
@@ -72,6 +84,8 @@ class SensorFault:
         self.held: Optional[tuple] = None
         self.frames: dict = {}  # control step -> (agentview, wrist, proprio), filled by observe()
         self.last_action: Optional[np.ndarray] = None
+        self.held_last = False
+        self.prev_pose: Optional[tuple] = None
 
     def observe(self, step, frame, fed, fresh, goals) -> None:
         """frame_hook: record every control step's observation (for delay_<k>)."""
@@ -112,12 +126,16 @@ class SensorFault:
             self.first_proprio = now[2].copy()
         fed = list(now)
         active = False
-        if self.name in WAIT_FAULTS and self.q % 2 == 1:  # hold still: zero motion, keep the gripper command
-            hold = np.zeros((8, 7))
-            hold[:, 6] = self.last_action[6]
-            self.prev = now
+        hold = self.q % 2 == 1 if self.name in ("lag_wrist_wait", "delay_8_wait") else (
+            self.name == "lag_wrist_waitopen" and self.q > 0 and not self.held_last and now[2][6] - now[2][7] > OPEN_ABOVE)
+        pose = self._wrist_pose() if self.name == "lag_wrist_warp" else None
+        if hold:  # hold still: zero motion, keep the gripper command
+            acts = np.zeros((8, 7))
+            acts[:, 6] = self.last_action[6]
+            self.prev, self.held_last = now, True
             self.q += 1
-            return hold, np.zeros((8, 7), np.float32), {"fault_active": True, "hold": True}
+            return acts, np.zeros((8, 7), np.float32), {"fault_active": True, "hold": True}
+        self.held_last = False
         if self.name == "proprio_offset":
             fed[2] = now[2].copy()
             fed[2][:3] += self.offset
@@ -128,10 +146,12 @@ class SensorFault:
             active = True
         elif self.name.startswith("lag_"):
             prev = self.prev if self.prev is not None else now
-            which = SOURCES if self.name == "lag_all" else ("wrist",) if self.name == "lag_wrist_wait" else (self.name[4:],)
+            which = SOURCES if self.name == "lag_all" else ("wrist",) if self.name in WRIST_LAGS else (self.name[4:],)
             for s in which:
                 fed[SOURCES.index(s)] = prev[SOURCES.index(s)]
             active = self.prev is not None
+            if self.name == "lag_wrist_warp" and self.prev_pose is not None:
+                fed[1] = warp_to(prev[1], self.prev_pose, pose)
         elif self.name.startswith("delay_"):
             step = max(self.frames) + 1 if self.frames else 0  # observe() has seen every step before this query
             k = int(self.name.split("_")[1])  # delay_8_wait: 8
@@ -142,6 +162,10 @@ class SensorFault:
         elif self.name in PHASE_FAULTS and self.held is not None and self.q <= self.trigger_q + FREEZE_QUERIES:
             fed, active = list(self.held), True
         out = policy.forward(policy.prepare(fed[0], fed[1], fed[2], instruction))
+        if self.name == "lag_wrist_slow":
+            out = dict(out, actions=np.asarray(out["actions"], np.float64).copy())
+            out["actions"][:, :6] *= SLOW
+        self.prev_pose = pose
         norm = np.asarray(out["actions_norm"])
         if self.grasp_q is None and norm[:, 6].mean() < GRIP_CLOSED_BELOW:
             self.grasp_q = self.q
@@ -154,6 +178,48 @@ class SensorFault:
         self.prev = now
         self.q += 1
         return out["actions"], norm, info
+
+
+    def _wrist_pose(self):
+        sim = self.env._env.sim
+        cid = sim.model.camera_name2id(WRIST_CAM)
+        return (sim.data.cam_xpos[cid].copy(), sim.data.cam_xmat[cid].reshape(3, 3).copy(), float(sim.model.cam_fovy[cid]))
+
+
+_MASK = None
+
+
+def gripper_mask() -> np.ndarray:
+    global _MASK
+    if _MASK is None:
+        from pathlib import Path
+
+        _MASK = np.load(Path(__file__).resolve().parents[3] / "assets" / "wrist_gripper_mask.npz")["mask"]
+    return _MASK
+
+
+def warp_to(img: np.ndarray, old: tuple, new: tuple, z0: float = TABLE_Z) -> np.ndarray:
+    """The wrist image taken at camera pose `old` as it would look from pose `new` if the scene were the table plane
+    z = z0 (nearest-pixel backward warp). Policy images are mirrored left-right against MuJoCo's camera frame. Pixels
+    that fall outside the old view, and the gripper's own pixels, keep their old values."""
+    (p0, m0, fovy), (p1, m1, _) = old, new
+    h, w = img.shape[:2]
+    f, c = (h / 2) / np.tan(np.deg2rad(fovy) / 2), (w - 1) / 2
+    v, u = np.mgrid[0:h, 0:w].astype(np.float64)
+    u = w - 1 - u
+    d = np.stack([(u - c) / f, -(v - c) / f, -np.ones_like(u)], -1) @ m1.T
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = (z0 - p1[2]) / d[..., 2]
+        pc = (p1 + t[..., None] * d - p0) @ m0
+        us = w - 1 - (c + f * pc[..., 0] / -pc[..., 2])
+        vs = c - f * pc[..., 1] / -pc[..., 2]
+    ok = (t > 0) & (pc[..., 2] < 0) & (us >= 0) & (us <= w - 1) & (vs >= 0) & (vs <= h - 1)
+    mask = gripper_mask()
+    if mask.shape == (h, w):
+        ok &= ~mask
+    out = np.array(img, copy=True)
+    out[ok] = img[np.rint(vs[ok]).astype(int), np.rint(us[ok]).astype(int)]
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ patching rescue

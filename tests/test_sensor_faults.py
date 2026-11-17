@@ -135,3 +135,32 @@ def test_delay_wait_feeds_the_frame_taken_when_the_hold_began():
             f(pol, imgs, p, "do it")
         f.observe(step, SimpleNamespace(agentview=imgs["agentview"], wrist=imgs["wrist"], proprio=p), None, False, {})
     assert [int(a[0, 0, 0]) for a, _, _ in pol.fed] == [0, 8, 24]
+
+
+def test_wait_before_grasp_holds_only_while_the_gripper_is_open():
+    f = SensorFault("lag_wrist_waitopen")
+    _bind(f)
+    pol, kinds = FakePolicy(), []
+    for q in range(6):
+        imgs, p = _obs(q)
+        p[6], p[7] = (0.04, -0.04) if q < 3 else (0.005, -0.005)
+        kinds.append("hold" if f(pol, imgs, p, "do it")[2].get("hold") else "query")
+    assert kinds == ["query", "hold", "query", "query", "query", "query"]
+
+
+def test_slow_halves_the_commanded_motion_and_keeps_the_gripper():
+    f = SensorFault("lag_wrist_slow")
+    _bind(f)
+    pol = FakePolicy()
+    pol.forward = lambda inp: {"actions": np.full((8, 7), 0.6), "actions_norm": np.ones((8, 7))}
+    imgs, p = _obs(0)
+    acts = f(pol, imgs, p, "do it")[0]
+    assert f.step_factor == 2 and np.allclose(acts[:, :6], 0.3) and np.allclose(acts[:, 6], 0.6)
+
+
+def test_warp_is_the_identity_when_the_camera_has_not_moved():
+    from vlamech.interventions.sensor_faults import warp_to
+
+    img = np.random.default_rng(0).integers(0, 255, (256, 256, 3), np.uint8)
+    pose = (np.array([0.0, 0.0, 1.3]), np.eye(3), 75.0)
+    assert (warp_to(img, pose, pose) == img).all()
