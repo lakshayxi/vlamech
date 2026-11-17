@@ -253,7 +253,11 @@ def patching() -> dict:
 
 
 # ------------------------------------------------------------------------------------------------- closed loop
-def closed_loop(partial: bool) -> dict:
+QUICK = {"dir": ROOT / "results" / "debug", "states": range(20, 30),
+         "faults": ("none", "proprio_offset", "lag_all", "freeze_transport")}
+
+
+def closed_loop(partial: bool, quick: bool = False) -> dict:
     from vlamech.analysis.ingest import grid as keygrid, load_run
     from vlamech.interventions.sensor_faults import FAULTS, PHASE_FAULTS
 
@@ -264,9 +268,9 @@ def closed_loop(partial: bool) -> dict:
     states = split_states("confirmatory")
     pick = protocol("sensor_conflict.tasks")
     runs, missing = {}, []
-    for f in FAULTS + PHASE_FAULTS:
-        d = FAULTS_DIR / f"identity-agentview+wrist__ins-own__fault-{f}__rep0"
-        keys = keygrid(range(10) if f in FAULTS else pick, states)
+    for f in (QUICK["faults"] if quick else FAULTS + PHASE_FAULTS):
+        d = QUICK["dir"] / f"quick-fault-{f}" if quick else FAULTS_DIR / f"identity-agentview+wrist__ins-own__fault-{f}__rep0"
+        keys = keygrid(pick if quick or f not in FAULTS else range(10), QUICK["states"] if quick else states)
         try:
             rd = load_run(d, keys)
         except FileNotFoundError:
@@ -274,7 +278,7 @@ def closed_loop(partial: bool) -> dict:
         if not rd.complete:
             if not partial:
                 rd.require_complete()
-            missing.append(f); continue
+            missing.append(f)  # partial: paired on the episodes finished so far
         runs[f] = rd
     if "none" not in runs:
         return {"missing": missing}
@@ -287,7 +291,9 @@ def closed_loop(partial: bool) -> dict:
                          "unsafe": bool(col or r["off_table"]), "steps": r["steps"]})
     df = pd.DataFrame(rows)
     out = {"missing": missing, "faults": {}}
-    for table, names, tasks in (("faults", FAULTS[1:], range(10)), ("phase_faults", PHASE_FAULTS, pick)):
+    tables = ((("faults", QUICK["faults"][1:], pick),) if quick else
+              (("faults", FAULTS[1:], range(10)), ("phase_faults", PHASE_FAULTS, pick)))
+    for table, names, tasks in tables:
         res = {}
         base = df[(df.fault == "none") & df.task.isin(list(tasks))].set_index(["task", "init_state"])
         res["none"] = {"success": float(base.success.mean()), "unsafe": float(base.unsafe.mean()), "n": int(len(base)),
@@ -320,8 +326,9 @@ def fmt(x, d=2):
 
 
 def report(s: dict) -> str:
-    L = ["# When sensors disagree", "",
-         "Held-out init states 20-49, pick-and-place tasks. Shares are the part of the policy's response to the edited "
+    L = ["# When sensors disagree (exploratory, reduced run)", "",
+         "Open loop: 59 held-out episodes (every third successful pick-and-place episode, init states 20-49). Closed loop: "
+         "pick-and-place tasks, init states 20-29, 60 paired episodes per fault. Patching was not run. Shares are the part of the policy's response to the edited "
          "world that follows each source (Shapley values, |Delta|^2-weighted; 95% stratified bootstrap CIs). Protocol: "
          "`configs/protocol.yaml` sensor_conflict, design: `docs/sensor_conflict.md`.", ""]
     sh = s.get("shares", {})
@@ -487,6 +494,8 @@ def figures(s: dict):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--partial", action="store_true")
+    ap.add_argument("--quick", action="store_true",
+                    help="exploratory: closed-loop faults from results/debug/quick-fault-* (pick-and-place tasks, init 20-29)")
     a = ap.parse_args()
     s = {}
     df = share_rows("confirmatory")
@@ -501,7 +510,7 @@ def main():
             s["tests"]["F_probe_auroc_layer16"] = [{"label": "layer 16", "n": p["n_test"], "estimate": p["auroc"][0],
                                                     "ci": p["auroc"][1:], "p_boot": p["p_boot"], "p_holm": p["p_boot"]}]
         s["patching"] = patching()
-    s["closed_loop"] = closed_loop(a.partial)
+    s["closed_loop"] = closed_loop(a.partial, a.quick)
     atomic_write_json(OUT / "summary.json", s)
     atomic_write_bytes(OUT / "summary.md", report(s).encode())
     figures(s)

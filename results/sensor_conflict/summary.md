@@ -1,0 +1,136 @@
+# When sensors disagree (exploratory, reduced run)
+
+Open loop: 59 held-out episodes (every third successful pick-and-place episode, init states 20-49). Closed loop: pick-and-place tasks, init states 20-29, 60 paired episodes per fault. Patching was not run. Shares are the part of the policy's response to the edited world that follows each source (Shapley values, |Delta|^2-weighted; 95% stratified bootstrap CIs). Protocol: `configs/protocol.yaml` sensor_conflict, design: `docs/sensor_conflict.md`.
+
+## object
+
+| phase | n | agentview | wrist | median |Delta| | render noise / |Delta| |
+|---|---|---|---|---|---|
+| approach | 59 | 0.13 [0.10, 0.16] | 0.87 [0.84, 0.90] | 0.61 | 0.06 |
+| pregrasp | 59 | 0.16 [0.11, 0.22] | 0.84 [0.78, 0.89] | 0.58 | 0.06 |
+| transport | 59 | 0.29 [0.21, 0.36] | 0.71 [0.64, 0.79] | 0.17 | 0.13 |
+| place | 59 | 0.29 [0.24, 0.34] | 0.71 [0.66, 0.76] | 0.66 | 0.07 |
+
+## arm
+
+| phase | n | agentview | wrist | proprio | median |Delta| | render noise / |Delta| |
+|---|---|---|---|---|---|---|
+| approach | 59 | 0.19 [0.16, 0.22] | 0.80 [0.77, 0.83] | 0.01 [0.00, 0.01] | 0.68 | 0.06 |
+| pregrasp | 59 | 0.23 [0.19, 0.27] | 0.76 [0.71, 0.80] | 0.01 [-0.00, 0.02] | 0.74 | 0.05 |
+| transport | 59 | 0.30 [0.24, 0.35] | 0.61 [0.56, 0.67] | 0.09 [0.04, 0.13] | 0.46 | 0.07 |
+| place | 59 | 0.38 [0.31, 0.45] | 0.52 [0.45, 0.58] | 0.11 [0.08, 0.13] | 0.81 | 0.05 |
+
+## gripper
+
+| phase | n | agentview | wrist | proprio | median |Delta| | render noise / |Delta| |
+|---|---|---|---|---|---|---|
+| approach | 57 | 0.14 [0.12, 0.15] | 0.06 [0.05, 0.07] | 0.80 [0.78, 0.82] | 3.48 | 0.01 |
+| pregrasp | 49 | 0.16 [0.14, 0.17] | 0.10 [0.09, 0.12] | 0.74 [0.72, 0.76] | 4.05 | 0.01 |
+| transport | 48 | 0.06 [0.05, 0.07] | 0.08 [0.06, 0.09] | 0.86 [0.84, 0.88] | 4.04 | 0.01 |
+| place | 48 | 0.08 [0.06, 0.11] | 0.14 [0.12, 0.17] | 0.77 [0.74, 0.80] | 1.51 | 0.03 |
+
+## stale
+
+| phase | n | agentview | wrist | proprio | median |Delta| | render noise / |Delta| |
+|---|---|---|---|---|---|---|
+| approach | 59 | 0.35 [0.33, 0.37] | 0.63 [0.62, 0.65] | 0.02 [0.01, 0.02] | 2.39 | 0.02 |
+| pregrasp | 59 | 0.28 [0.27, 0.30] | 0.65 [0.63, 0.67] | 0.06 [0.05, 0.08] | 1.44 | 0.03 |
+| transport | 59 | 0.26 [0.24, 0.28] | 0.29 [0.26, 0.31] | 0.46 [0.42, 0.50] | 2.16 | 0.02 |
+| place | 59 | 0.32 [0.28, 0.36] | 0.41 [0.38, 0.44] | 0.27 [0.25, 0.30] | 2.51 | 0.02 |
+
+## arm-blur-8
+
+| phase | n | agentview | wrist | proprio | median |Delta| | render noise / |Delta| |
+|---|---|---|---|---|---|---|
+| approach | 59 | 0.12 [0.09, 0.15] | 0.87 [0.84, 0.90] | 0.01 [0.00, 0.02] | 0.51 | 0.07 |
+| pregrasp | 59 | 0.09 [0.05, 0.13] | 0.88 [0.83, 0.93] | 0.03 [0.01, 0.04] | 0.48 | 0.07 |
+| transport | 59 | 0.05 [-0.00, 0.10] | 0.45 [0.37, 0.54] | 0.50 [0.39, 0.60] | 0.30 | 0.08 |
+| place | 59 | 0.13 [0.10, 0.16] | 0.44 [0.38, 0.51] | 0.44 [0.35, 0.51] | 0.51 | 0.08 |
+
+## arm-noise-128
+
+| phase | n | agentview | wrist | proprio | median |Delta| | render noise / |Delta| |
+|---|---|---|---|---|---|---|
+| approach | 59 | 0.05 [0.03, 0.07] | 0.94 [0.92, 0.96] | 0.01 [0.00, 0.01] | 0.54 | 0.07 |
+| pregrasp | 59 | 0.06 [0.03, 0.09] | 0.92 [0.89, 0.95] | 0.02 [0.01, 0.04] | 0.49 | 0.08 |
+| transport | 59 | 0.07 [0.04, 0.09] | 0.43 [0.34, 0.56] | 0.50 [0.38, 0.59] | 0.36 | 0.08 |
+| place | 59 | 0.08 [0.06, 0.10] | 0.53 [0.45, 0.63] | 0.39 [0.29, 0.47] | 0.58 | 0.08 |
+
+## Pre-specified tests
+
+**A_wrist_minus_agentview_object**
+
+| | n | estimate [95% CI] | p (bootstrap) | p (Holm) |
+|---|---|---|---|---|
+| approach | 59 | 0.741 [0.684, 0.792] | 0.0001 | 0.0004 |
+| pregrasp | 59 | 0.672 [0.559, 0.776] | 0.0001 | 0.0004 |
+| transport | 59 | 0.419 [0.269, 0.582] | 0.0001 | 0.0004 |
+| place | 59 | 0.418 [0.320, 0.516] | 0.0001 | 0.0004 |
+
+**B_proprio_share_arm**
+
+| | n | estimate [95% CI] | p (bootstrap) | p (Holm) |
+|---|---|---|---|---|
+| approach | 59 | 0.007 [0.004, 0.011] | 0.0001 | 0.0004 |
+| pregrasp | 59 | 0.009 [-0.001, 0.019] | 0.0765 | 0.0765 |
+| transport | 59 | 0.086 [0.041, 0.132] | 0.0003 | 0.0006 |
+| place | 59 | 0.106 [0.082, 0.133] | 0.0001 | 0.0004 |
+
+**C_proprio_share_gripper**
+
+| | n | estimate [95% CI] | p (bootstrap) | p (Holm) |
+|---|---|---|---|---|
+| approach | 57 | 0.803 [0.782, 0.824] | 0.0001 | 0.0004 |
+| pregrasp | 49 | 0.741 [0.722, 0.759] | 0.0001 | 0.0004 |
+| transport | 48 | 0.863 [0.843, 0.883] | 0.0001 | 0.0004 |
+| place | 48 | 0.774 [0.737, 0.807] | 0.0001 | 0.0004 |
+
+**D_relevance_log_ratio**
+
+| | n | estimate [95% CI] | p (bootstrap) | p (Holm) |
+|---|---|---|---|---|
+| approach | 59 | 1.071 [0.855, 1.283] | 0.0001 | 0.0004 |
+| pregrasp | 59 | 1.379 [1.131, 1.631] | 0.0001 | 0.0004 |
+| transport | 59 | 0.433 [0.125, 0.721] | 0.0081 | 0.0081 |
+| place | 59 | 1.664 [1.424, 1.909] | 0.0001 | 0.0004 |
+
+**E_proprio_share_corrupted_minus_clean**
+
+| | n | estimate [95% CI] | p (bootstrap) | p (Holm) |
+|---|---|---|---|---|
+| arm-blur-8 | 236 | 0.170 [0.132, 0.209] | 0.0001 | 0.0002 |
+| arm-noise-128 | 236 | 0.171 [0.126, 0.217] | 0.0001 | 0.0002 |
+
+**F_probe_auroc_layer16**
+
+| | n | estimate [95% CI] | p (bootstrap) | p (Holm) |
+|---|---|---|---|---|
+| layer 16 | 4448 | 0.539 [0.532, 0.546] | 0.0001 | 0.0001 |
+
+## Detecting the conflict from the policy's own state (probe)
+
+| layer | AUROC [95% CI] | p | object | arm | gripper | unseen edit: object / arm / gripper |
+|---|---|---|---|---|---|---|
+| 8 | 0.52 [0.52, 0.53] | 0.0005 | 0.50 | 0.50 | 0.55 | 0.50 / 0.50 / 0.50 |
+| 16 | 0.54 [0.53, 0.55] | 0.0001 | 0.52 | 0.51 | 0.58 | 0.51 / 0.50 / 0.49 |
+| 24 | 0.54 [0.53, 0.54] | 0.0005 | 0.51 | 0.50 | 0.58 | 0.50 / 0.50 / 0.49 |
+
+## Gripper decisions under the gripper edit
+
+| phase | n | edited world flips | proprio alone flips | cameras alone flip |
+|---|---|---|---|---|
+| approach | 57 | 0.93 | 0.49 | 0.00 |
+| pregrasp | 49 | 0.84 | 0.41 | 0.12 |
+| transport | 48 | 0.23 | 0.15 | 0.00 |
+| place | 48 | 0.12 | 0.00 | 0.00 |
+
+## Closed loop: faults
+
+Paired plain run: success 0.967, unsafe 0.017 (n = 60).
+
+| fault | n | success | difference [95% CI] | p (Holm) | unsafe | difference [95% CI] | p (Holm) |
+|---|---|---|---|---|---|---|---|
+| proprio_offset | 60 | 0.967 | 0.000 [-0.050, 0.050] | 1 | 0.017 | 0.000 [-0.050, 0.050] | 1 |
+| lag_all | 60 | 0.117 | -0.850 [-0.933, -0.767] | 2.66e-15 | 0.417 | 0.400 [0.333, 0.467] | 3.58e-07 |
+| freeze_transport | 60 | 0.583 | -0.383 [-0.467, -0.300] | 4.77e-07 | 0.117 | 0.100 [0.033, 0.167] | 0.0625 |
+
