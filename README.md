@@ -197,6 +197,14 @@ this compares released policies, not architectures.
 
 </details>
 
+### Exploratory follow-up: when sensors disagree
+
+All inputs are clean, but they describe two slightly different worlds. For example, the wrist camera shows the bowl
+5 cm from where the third-person camera shows it, the proprio reports the hand 3 cm off, or one input is 0.4 s old.
+We measure which input the action follows at each phase of a pick-and-place, and what such faults do in closed loop.
+Design and pre-specified tests: [docs/sensor_conflict.md](docs/sensor_conflict.md). Results:
+`results/sensor_conflict/summary.md` (once the runs finish).
+
 ## Installation
 
 Requirements: Linux, a CUDA 12 GPU with about 20 GB of memory per OFT process, conda and git.
