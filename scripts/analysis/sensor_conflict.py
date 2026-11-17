@@ -254,11 +254,29 @@ def patching() -> dict:
 
 # ------------------------------------------------------------------------------------------------- closed loop
 QUICK = {"dir": ROOT / "results" / "debug", "states": range(20, 30),
-         "faults": ("none", "proprio_offset", "lag_all", "freeze_transport")}
+         "faults": ("none", "delay_2", "delay_4", "delay_8", "delay_16", "lag_agentview", "lag_wrist", "lag_proprio",
+                    "lag_all", "proprio_offset", "gripper_stuck", "freeze_transport")}
+DELAY_S = {"none": 0.0, "delay_2": 0.1, "delay_4": 0.2, "delay_8": 0.4, "delay_16": 0.8}
+
+
+def behaviour(tr: dict) -> dict:
+    """Hand and gripper behaviour from a trace: mean hand speed (mm/step), share of 8-step hand displacements that reverse
+    the previous one (cos < 0), and grasp cycles (finger opening falling below 4 cm)."""
+    eef = np.asarray(tr["eef_pos"])
+    v = np.linalg.norm(np.diff(eef, axis=0), axis=1) * 1000
+    d = eef[8::8] - eef[:-8:8] if len(eef) > 16 else np.zeros((0, 3))
+    n = np.linalg.norm(d, axis=1)
+    ok = (n[1:] > 2e-3) & (n[:-1] > 2e-3)
+    cos = (d[1:] * d[:-1]).sum(1)[ok] / (n[1:] * n[:-1])[ok] if ok.any() else np.array([])
+    op = np.asarray(tr["gripper_q"])
+    opening = op[:, 0] - op[:, 1]
+    closed = opening < 0.04
+    return {"speed": float(v.mean()) if len(v) else 0.0, "reversal": float((cos < 0).mean()) if len(cos) else 0.0,
+            "grasp_cycles": int((closed[1:] & ~closed[:-1]).sum())}
 
 
 def closed_loop(partial: bool, quick: bool = False) -> dict:
-    from vlamech.analysis.ingest import grid as keygrid, load_run
+    from vlamech.analysis.ingest import grid as keygrid, load_run, trace
     from vlamech.interventions.sensor_faults import FAULTS, PHASE_FAULTS
 
     thr_path = ROOT / "results" / "oracle_calibration" / "thresholds.json"
@@ -288,7 +306,7 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
             t = k[0]
             col = r["max_contact_force"]["environment"] > thr["force"][str(t)]["environment"]
             rows.append({"fault": f, "task": t, "init_state": k[1], "success": bool(r["success"]),
-                         "unsafe": bool(col or r["off_table"]), "steps": r["steps"]})
+                         "unsafe": bool(col or r["off_table"]), "steps": r["steps"], **behaviour(trace(rd, k))})
     df = pd.DataFrame(rows)
     out = {"missing": missing, "faults": {}}
     tables = ((("faults", QUICK["faults"][1:], pick),) if quick else
@@ -306,6 +324,8 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
             j = base.join(x, lsuffix="_0", rsuffix="_1", how="inner").reset_index()
             e = res[f] = {"n": int(len(j)), "success": float(j.success_1.mean()), "unsafe": float(j.unsafe_1.mean()),
                           "success_wilson": list(wilson_ci(int(j.success_1.sum()), len(j)))}
+            for m in ("speed", "reversal", "grasp_cycles"):
+                e[m], e[f"{m}_plain"] = float(j[f"{m}_1"].mean()), float(j[f"{m}_0"].mean())
             for m in ("success", "unsafe"):
                 mc = mcnemar_exact(j[f"{m}_0"].to_numpy(), j[f"{m}_1"].to_numpy())
                 b = boot(j, lambda d, m=m: float(d[f"{m}_1"].mean() - d[f"{m}_0"].mean()))
@@ -317,6 +337,37 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
                 for (f, _), p in zip(lst, holm([p for _, p in lst])):
                     res[f][f"{m}_p_holm"] = float(p)
         out[table] = res
+    return out
+
+
+def patching_stale() -> dict:
+    """Removed share of the 0.4 s single-source delay conflicts' effect, by group and depth (descriptive)."""
+    grid = [str(p) for p in protocol("sensor_conflict.patch_grid")]
+    rows = []
+    for f in sorted((OUT / "patching_stale").glob("task*-init*.npz")):
+        z = np.load(f)
+        t, i = int(f.stem[4:].split("-")[0]), int(f.stem.split("init")[1])
+        for ph in ("pregrasp", "transport"):
+            now = z[f"{ph}__now"][:, A.ARM].ravel()
+            for src in ("agentview", "wrist", "proprio"):
+                sv = z[f"{ph}__mixed__{src}"][:, A.ARM].ravel() - now
+                for gi, g in enumerate(PATCH_GROUPS):
+                    for pi, p in enumerate(grid):
+                        ap = z[f"{ph}__patch__{src}"][gi, pi][:, A.ARM].ravel()
+                        rows.append({"task": t, "init_state": i, "phase": ph, "conflict": src, "group": g, "point": p,
+                                     "num": float((ap - now) @ sv), "s2": float(sv @ sv)})
+    df = pd.DataFrame(rows)
+    out = {"grid": grid}
+    if df.empty:
+        return out
+    for (ph, c, g), d in df.groupby(["phase", "conflict", "group"]):
+        curve = []
+        for p in grid:
+            b = boot(d[d.point == p], lambda x: 1 - x.num.sum() / x.s2.sum(), n_boot=1000)
+            curve.append([b["estimate"], b["ci_low"], b["ci_high"]])
+        out.setdefault(ph, {}).setdefault(c, {})[g] = curve
+        out[ph][c]["n"] = int(d[["task", "init_state"]].drop_duplicates().shape[0])
+        out[ph][c]["effect"] = float(np.sqrt(d[d.point == grid[0]].s2.mean()))
     return out
 
 
@@ -370,13 +421,15 @@ def report(s: dict) -> str:
         r = cl[table]
         L += [f"## Closed loop: {table.replace('_', ' ')}", "",
               f"Paired plain run: success {r['none']['success']:.3f}, unsafe {r['none']['unsafe']:.3f} (n = {r['none']['n']}).", "",
-              "| fault | n | success | difference [95% CI] | p (Holm) | unsafe | difference [95% CI] | p (Holm) |",
-              "|---|---|---|---|---|---|---|---|"]
+              "| fault | n | success | difference [95% CI] | p (Holm) | unsafe | difference [95% CI] | p (Holm) | hand speed mm/step (plain) | reversals (plain) | grasp cycles (plain) |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
         for f, e in r.items():
             if f == "none":
                 continue
             L.append(f"| {f} | {e['n']} | {e['success']:.3f} | {fmt(e['success_diff'], 3)} | {e.get('success_p_holm', float('nan')):.3g} | "
-                     f"{e['unsafe']:.3f} | {fmt(e['unsafe_diff'], 3)} | {e.get('unsafe_p_holm', float('nan')):.3g} |")
+                     f"{e['unsafe']:.3f} | {fmt(e['unsafe_diff'], 3)} | {e.get('unsafe_p_holm', float('nan')):.3g} | "
+                     f"{e['speed']:.1f} ({e['speed_plain']:.1f}) | {e['reversal']:.2f} ({e['reversal_plain']:.2f}) | "
+                     f"{e['grasp_cycles']:.2f} ({e['grasp_cycles_plain']:.2f}) |")
         L.append("")
     if cl.get("missing"):
         L.append(f"Closed-loop runs not complete: {', '.join(cl['missing'])}.")
@@ -430,8 +483,16 @@ def figures(s: dict):
         fig.tight_layout()
         fig.savefig(FIG / "shares.png", dpi=200, bbox_inches="tight", facecolor=SURF)
         plt.close(fig)
-    pt = s.get("patching", {})
-    if "pregrasp" in pt:
+    for name, pt in (("patching", s.get("patching", {})), ("patching_delay", s.get("patching_stale", {}))):
+        if "pregrasp" in pt:
+            _patch_fig(plt, pt, name)
+    cl = s.get("closed_loop", {})
+    if "faults" in cl:
+        _closed_fig(plt, cl)
+
+
+def _patch_fig(plt, pt, name):
+    if True:
         grid = pt["grid"]
         xs = [-1 if p == "embed" else int(p) for p in grid]
         conflicts = [c for c in CONFLICTS if c in pt["pregrasp"]]
@@ -450,17 +511,45 @@ def figures(s: dict):
                     ax.plot(xs, cur[:, 0], color=col, lw=2, label=lab)
                     ax.fill_between(xs, cur[:, 1], cur[:, 2], color=col, alpha=0.15, lw=0)
                 ax.set_ylim(-0.2, 1.1)
-                ax.set_title(f"{c} conflict, {ph} (n = {pt[ph][c]['n']})", fontsize=9, color=INK)
+                ax.set_title(f"{c} {'0.4 s late' if name == 'patching_delay' else 'conflict'}, {ph} (n = {pt[ph][c]['n']})",
+                             fontsize=9, color=INK)
                 if r == 1:
                     ax.set_xlabel("layer patched (-1 = input)", fontsize=8, color=INK)
                 if c_i == 0:
                     ax.set_ylabel("share of the conflict's effect removed", fontsize=8, color=INK)
                 ax.legend(frameon=False, fontsize=7, loc="center right")
         fig.tight_layout()
-        fig.savefig(FIG / "patching.png", dpi=200, bbox_inches="tight", facecolor=SURF)
+        fig.savefig(FIG / f"{name}.png", dpi=200, bbox_inches="tight", facecolor=SURF)
         plt.close(fig)
-    cl = s.get("closed_loop", {})
-    if "faults" in cl:
+
+
+def _ladder_fig(plt, r):
+    xs = [x for f, x in DELAY_S.items() if f in r]
+    fs = [f for f in DELAY_S if f in r]
+    if len(fs) < 3:
+        return
+    fig, ax = plt.subplots(figsize=(4.8, 3.4), facecolor=SURF)
+    _style(ax)
+    for m, col, mk, lab in (("success", COLORS["agentview"], "o", "success"), ("unsafe", COLORS["wrist"], "s", "unsafe outcome")):
+        y = [r[f][m] for f in fs]
+        ax.plot(xs, y, color=col, lw=2, marker=mk, ms=6, mec=SURF, label=lab)
+        if m == "success":
+            lo = [r[f]["success_wilson"][0] for f in fs]
+            hi = [r[f]["success_wilson"][1] for f in fs]
+            ax.fill_between(xs, lo, hi, color=col, alpha=0.15, lw=0)
+    ax.set_xticks(xs, [f"{x:g}" for x in xs])
+    ax.set_xlabel("observation delay (s), whole observation", fontsize=8, color=INK)
+    ax.set_ylim(0, 1.02)
+    ax.set_title(f"delay ladder, pick-and-place (n = {r[fs[1]]['n']} paired)", fontsize=9, color=INK)
+    ax.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    fig.savefig(FIG / "delay_ladder.png", dpi=200, bbox_inches="tight", facecolor=SURF)
+    plt.close(fig)
+
+
+def _closed_fig(plt, cl):
+    _ladder_fig(plt, cl["faults"])
+    if True:
         tabs = [t for t in ("faults", "phase_faults") if t in cl]
         fig, axes = plt.subplots(1, len(tabs), figsize=(5.2 * len(tabs), 3.6), facecolor=SURF)
         axes = np.atleast_1d(axes)
@@ -510,6 +599,7 @@ def main():
             s["tests"]["F_probe_auroc_layer16"] = [{"label": "layer 16", "n": p["n_test"], "estimate": p["auroc"][0],
                                                     "ci": p["auroc"][1:], "p_boot": p["p_boot"], "p_holm": p["p_boot"]}]
         s["patching"] = patching()
+        s["patching_stale"] = patching_stale()
     s["closed_loop"] = closed_loop(a.partial, a.quick)
     atomic_write_json(OUT / "summary.json", s)
     atomic_write_bytes(OUT / "summary.md", report(s).encode())
