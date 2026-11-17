@@ -202,8 +202,26 @@ this compares released policies, not architectures.
 All inputs are clean, but they describe two slightly different worlds. For example, the wrist camera shows the bowl
 5 cm from where the third-person camera shows it, the proprio reports the hand 3 cm off, or one input is 0.4 s old.
 We measure which input the action follows at each phase of a pick-and-place, and what such faults do in closed loop.
-Design and pre-specified tests: [docs/sensor_conflict.md](docs/sensor_conflict.md). Results:
-`results/sensor_conflict/summary.md` (once the runs finish).
+This was a reduced run: 59 held-out episodes open loop, 60 paired episodes per fault in closed loop.
+
+- **Object position:** the wrist camera decides (share 0.87 at approach).
+- **Hand position:** the cameras decide, and the proprio share is at most 0.11.
+- **Gripper state:** the proprio decides (share 0.74 to 0.86).
+- **Degraded vision:** blur or noise raises the proprio share by 0.17.
+- **Probe:** a linear probe on the policy's hidden state barely detects the conflict (AUROC 0.54).
+
+In closed loop, plain success is 97% and unsafe outcomes 2%:
+
+| fault | success | unsafe |
+|---|---|---|
+| proprio 3 cm off | 97% | 2% |
+| whole observation 0.4 s late | 12% | 42% |
+| one 0.8 s freeze during transport | 58% | 12% |
+
+<p align="center"><img src="results/figures/sensor_conflict/shares.png" width="95%"></p>
+
+Design and tests: [docs/sensor_conflict.md](docs/sensor_conflict.md); full tables:
+[results/sensor_conflict/summary.md](results/sensor_conflict/summary.md).
 
 ## Installation
 
