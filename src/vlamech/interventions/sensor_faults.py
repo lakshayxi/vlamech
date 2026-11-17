@@ -139,3 +139,70 @@ class SensorFault:
         self.prev = now
         self.q += 1
         return out["actions"], norm, info
+
+
+# ------------------------------------------------------------------------------------------------ patching rescue
+RESCUES = ("rescue_wrist_12", "rescue_readout_20", "rescue_wrist_12_random", "rescue_readout_20_random")
+
+
+class Rescue(SensorFault):
+    """lag_wrist (the wrist frame of the previous query) with one layer's states at one token group put back.
+
+    rescue_<group>_<layer>: the group's residual states at that layer are replaced by those of the same query with the
+    fresh wrist frame (a causal test, not a deployable fix: it needs the fresh frame). With _random, the states come
+    from another episode instead (same task, next held-out init state, its clean captured observation at the same
+    query, or its last one), the control for 'any in-distribution state helps'. Needs the in-process policy (hooks)."""
+
+    def __init__(self, name: str):
+        if name not in RESCUES:
+            raise ValueError(f"unknown rescue {name!r}; known: {RESCUES}")
+        parts = name.split("_")
+        self.group, self.layer, self.random = parts[1], int(parts[2]), name.endswith("_random")
+        self.name = name
+        self.env, self.key, self.donor_cap = None, None, None
+        self.reset()
+
+    def bind(self, env, key: str) -> None:
+        self.env, self.key = env, key
+        if self.random:
+            from pathlib import Path
+
+            from vlamech.config import protocol, split_states
+            from vlamech.envs.replay import load_capture
+
+            t, init = int(key[4:].split("-")[0]), int(key.split("init")[1])
+            states = split_states("confirmatory")
+            donor = states[(states.index(init) + 1) % len(states)]
+            root = Path(__file__).resolve().parents[3]
+            self.donor_cap = load_capture(root / protocol("sensor_conflict.captures")["confirmatory"] / "captures"
+                                          / f"task{t}-init{donor}.npz")
+
+    def __call__(self, policy, imgs, proprio, instruction):
+        from vlamech.interventions.hooks import Capture, Intervention, hooked
+        from vlamech.interventions.patching import group_positions
+
+        now = (imgs["agentview"], imgs["wrist"], np.array(proprio, np.float64, copy=True))
+        fed = (now[0], self.prev[1] if self.prev is not None else now[1], now[2])
+        if self.random:
+            j = min(self.q, len(self.donor_cap["step"]) - 1)
+            src = (self.donor_cap["agentview"][j], self.donor_cap["wrist"][j], self.donor_cap["proprio"][j])
+        else:
+            src = now
+        d_inp = policy.prepare(*src, instruction)
+        with hooked(policy, captures=[Capture("resid", self.layer, to_cpu=False)], expected_seq_len=d_inp.layout.seq_len) as s:
+            policy.forward(d_inp)
+        h = s.captures[("resid", self.layer)]
+        inp = policy.prepare(*fed, instruction)
+        pos = group_positions(inp.layout, self.group)
+        iv = Intervention("resid", self.layer, pos, "replace", h[:, torch_index(pos, h)])
+        with hooked(policy, interventions=[iv], expected_seq_len=inp.layout.seq_len):
+            out = policy.forward(inp)
+        self.prev = now
+        self.q += 1
+        return out["actions"], np.asarray(out["actions_norm"]), {"fault_active": self.q > 1}
+
+
+def torch_index(pos, h):
+    import torch
+
+    return torch.as_tensor(np.asarray(pos, np.int64), device=h.device)

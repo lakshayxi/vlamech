@@ -178,7 +178,14 @@ def main(argv=None):
             raise ValueError("sensor faults are OFT only")
         if args.sensor_fault in PHASE_FAULTS and not set(tasks) <= set(protocol("sensor_conflict.tasks")):
             raise ValueError(f"phase faults run on the pick-and-place tasks {protocol('sensor_conflict.tasks')} only")
-        action_fn = SensorFault(args.sensor_fault)
+        if args.sensor_fault.startswith("rescue_"):
+            from vlamech.interventions.sensor_faults import Rescue
+
+            if args.policy_server is not None:
+                raise ValueError("rescue runs patch activations and need the in-process policy")
+            action_fn = Rescue(args.sensor_fault)
+        else:
+            action_fn = SensorFault(args.sensor_fault)
     pre = experiments.preflight(args.experiment, states, spec, args.instruction, n_states, mitigation, args.policy,
                                 sensor_fault=args.sensor_fault)
 
