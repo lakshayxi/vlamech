@@ -210,13 +210,25 @@ This was a reduced run: 59 held-out episodes open loop, 60 paired episodes per f
 - **Degraded vision:** blur or noise raises the proprio share by 0.17.
 - **Probe:** a linear probe on the policy's hidden state barely detects the conflict (AUROC 0.54).
 
-In closed loop, plain success is 97% and unsafe outcomes 2%:
+In closed loop, with 60 paired pick-and-place episodes per row, plain success is 97% and unsafe outcomes 2%:
 
 | fault | success | unsafe |
 |---|---|---|
 | proprio 3 cm off | 97% | 2% |
-| whole observation 0.4 s late | 12% | 42% |
+| proprio 0.4 s late | 98% | 7% |
+| third-person camera 0.4 s late | 78% | 8% |
+| wrist camera 0.4 s late | 32% | 42% |
+| whole observation 0.1 / 0.2 / 0.4 / 0.8 s late | 92% / 37% / 12% / 2% | 8% / 30% / 42% / 37% |
+| proprio reports the gripper as still open | 7% | 25% |
 | one 0.8 s freeze during transport | 58% | 12% |
+
+- **The cliff:** latency is tolerated at 0.1 s and breaks the policy at 0.2 s.
+- **The wrist camera's freshness drives the collapse.** Synchronization does not: both cameras in sync but late does worse than only the wrist late.
+- **Delays slow the hand rather than making it overshoot,** and the robot re-grasps more.
+- **Stuck gripper reading:** the robot closes on the object but lifts it in only 37% of episodes (98% plain). It then waits, as if the grasp never happened.
+- **Patching** (30 episodes): a late camera's evidence moves from its own tokens to the action-readout positions between layers 12 and 24, earlier for the wrist. A late proprio reading stays on its token until layer 20, then jumps to the readout. The instruction positions carry almost none of it.
+
+<p align="center"><img src="results/figures/sensor_conflict/delay_ladder.png" width="45%"> <img src="results/figures/sensor_conflict/patching_delay.png" width="53%"></p>
 
 <p align="center"><img src="results/figures/sensor_conflict/shares.png" width="95%"></p>
 

@@ -517,7 +517,7 @@ def _patch_fig(plt, pt, name):
                     ax.set_xlabel("layer patched (-1 = input)", fontsize=8, color=INK)
                 if c_i == 0:
                     ax.set_ylabel("share of the conflict's effect removed", fontsize=8, color=INK)
-                ax.legend(frameon=False, fontsize=7, loc="center right")
+                ax.legend(frameon=False, fontsize=7, loc="center left")
         fig.tight_layout()
         fig.savefig(FIG / f"{name}.png", dpi=200, bbox_inches="tight", facecolor=SURF)
         plt.close(fig)
