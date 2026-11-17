@@ -333,7 +333,7 @@ sensor_conflict:
     source: rule
     why: "whether the policy's own state reveals that its inputs disagree, before it acts"
   patching:
-    value: "phases pregrasp and transport; conflicts {agentview only, wrist only} of the object edit and {proprio only} of the arm edit; single-point patches of the conflicting source's positions, the instruction positions and the readout positions with the real run's states, at the points of sensor_conflict.patch_grid; removed share = 1 - <a_patched - a_empty, s> / |s|^2 with s = a_T - a_empty"
+    value: "phases pregrasp and transport; conflicts {agentview only, wrist only} of the object edit and {proprio only} of the arm edit; single-point patches of the conflicting source's positions, the instruction positions and the readout positions with the real run's states, at the points of sensor_conflict.patch_grid; removed share = 1 - <a_patched - a_empty, s> / |s|^2 with s = a_T - a_empty. Not run on held-out data (2026-11-17, for time); two exploratory episodes only"
     source: rule
     why: "single-point patches (not prefix clamps, which reproduce the real run by construction) show at which depth the conflicting evidence leaves its own positions and reaches the positions the action head reads"
   patch_grid:
