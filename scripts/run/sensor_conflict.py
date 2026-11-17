@@ -16,7 +16,7 @@ frame and proprio (vlamech.analysis.arbitration), under the own instruction:
   render     the real world's action from the re-render and from the captured observation (render noise floor)
 For the object, arm and gripper edits the readout positions' mean state at the probe layers is stored for every input.
 Patching (pregrasp and transport): single-point patches of the conflicting source's, the instruction's and the readout
-positions with the real run's states, at every point of patching.layer_grid.
+positions with the real run's states, at the points of sensor_conflict.patch_grid.
 Every forward is batch 1 (exact; batching changes bf16 results).
 """
 from __future__ import annotations
@@ -228,7 +228,7 @@ def main():
             if ok[k] and int(k[4:].split("-")[0]) in tasks]
     keys = keys[: a.limit] if a.limit else keys
     keys = [k for i, k in enumerate(keys) if i % sn == si]
-    grid = list(protocol("patching.layer_grid"))
+    grid = list(protocol("sensor_conflict.patch_grid"))
     vision = [c for c in protocol("sensor_conflict.vision_conditions") if c != "identity"]
     require_gpu(20)
     repo = protocol("policy.checkpoint")

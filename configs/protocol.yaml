@@ -333,9 +333,13 @@ sensor_conflict:
     source: rule
     why: "whether the policy's own state reveals that its inputs disagree, before it acts"
   patching:
-    value: "phases pregrasp and transport; conflicts {agentview only, wrist only} of the object edit and {proprio only} of the arm edit; single-point patches of the conflicting source's positions, the instruction positions and the readout positions with the real run's states, at every point of patching.layer_grid; removed share = 1 - <a_patched - a_empty, s> / |s|^2 with s = a_T - a_empty"
+    value: "phases pregrasp and transport; conflicts {agentview only, wrist only} of the object edit and {proprio only} of the arm edit; single-point patches of the conflicting source's positions, the instruction positions and the readout positions with the real run's states, at the points of sensor_conflict.patch_grid; removed share = 1 - <a_patched - a_empty, s> / |s|^2 with s = a_T - a_empty"
     source: rule
     why: "single-point patches (not prefix clamps, which reproduce the real run by construction) show at which depth the conflicting evidence leaves its own positions and reaches the positions the action head reads"
+  patch_grid:
+    value: [embed, 4, 8, 12, 16, 20, 24, 28, 31]
+    source: rule
+    why: "every fourth decoder layer plus the input and the last layer: half the forwards of patching.layer_grid, which on one shared GPU would take about 7 hours for the held-out pass (changed 2026-11-17, before any held-out forward)"
   tests:
     value: "held-out, stratified episode bootstrap (strata = task) with n_boot draws, two-sided bootstrap p; Holm within each family: (A) object edit, phi_wrist - phi_agentview != 0 at each of 4 phases; (B) arm edit, phi_proprio != 0 at each of 4 phases; (C) gripper edit, phi_proprio != 0 at each of 4 phases; (D) relevance, mean log(|Delta_object| / |Delta_distractor|) > 0 at each of 4 phases; (E) arm edit, phi_proprio(corrupted) - phi_proprio(clean) != 0 for blur-8 and noise-128, pooled over phases; (F) probe AUROC > 0.5 at layer 16. Shares of the stale edit, off-axis values, gripper flips and the patching curves are descriptive"
     source: rule
