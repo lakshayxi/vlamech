@@ -77,10 +77,33 @@ Each test uses a stratified episode bootstrap, with Holm correction within each 
 
 These are descriptive: the stale-edit shares, the off-axis movement, gripper decision flips and the patching curves.
 
+## What was actually run
+
+The full plan above was cut for time, and everything reported is **exploratory**:
+
+- **Open loop:** 59 held-out episodes, every third successful pick-and-place episode
+  (`sensor_conflict.py --shard 0/3`), without the object/arm patching. The probe was trained on 7 exploratory episodes.
+- **Closed loop:** debug runs on the pick-and-place tasks, init states 20–29: 60 paired episodes per condition, in
+  `results/debug/quick-fault-*`. The pre-registered `sensor_faults` runs (all tasks, 300 episodes) were not run.
+- **Added after the first results, also exploratory:**
+  - A delay ladder: `delay_2`, `delay_4`, `delay_8`, `delay_16` control steps of 0.05 s.
+  - Patching of 0.4 s single-source delays on 30 of the 59 episodes (`--patch-stale --shard 0/2`).
+  - A closed-loop patching rescue of the late wrist camera (`rescue_*` faults): one layer's states at the wrist or
+    readout positions are replaced. The states come from the fresh frame, another episode, the same episode's clean
+    rollout at the same or another phase, norm-matched noise, or the stale states themselves (no-op).
+- **Rescue controls:** the donor variants separate generic replacement (noise, wrong phase) from task-phase information
+  (same-phase donors) and state-specific information (the fresh state). See `results/sensor_conflict/summary.md`.
+- **Tests:** the tests above are computed on these reduced samples. P-values are Holm-corrected within each table
+  only, not across the whole follow-up.
+
 ## Running
 
 ```bash
-python scripts/run/sensor_conflict.py --split confirmatory --shard 0/2   # and 1/2
-python scripts/run/closed_loop.py --experiment sensor_faults --states confirmatory --sensor-fault lag_wrist
-python scripts/analysis/sensor_conflict.py
+python scripts/run/sensor_conflict.py --split exploratory --no-patching
+python scripts/run/sensor_conflict.py --split confirmatory --no-patching --shard 0/3
+python scripts/run/sensor_conflict.py --split confirmatory --patch-stale --shard 0/2
+# closed loop: one condition (served model for plain faults; in-process for rescue_*)
+python scripts/run/closed_loop.py --experiment debug --states 20-29 --tasks 1,2,4,6,8,9 \
+    --sensor-fault delay_8 --run-name quick-fault-delay_8 --record-actions
+python scripts/analysis/sensor_conflict.py --quick
 ```
