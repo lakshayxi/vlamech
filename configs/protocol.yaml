@@ -287,3 +287,68 @@ cross_model:
     value: "pi0.5 success per condition with Wilson intervals; exact McNemar of each corruption against pi0.5's own clean run, Holm over corruptions; difference of success drops, pi0.5 minus OFT (sweep episodes), stratified cluster bootstrap, descriptive"
     source: rule
     why: "whether the loss of success is specific to OFT; a comparison of two checkpoints, not of architectures"
+
+# Follow-up study: what the policy does when its sensors disagree. Every entry below was fixed on 2026-11-17, before
+# any held-out forward pass of this study; the code was developed on exploratory captures and calibration rollouts.
+sensor_conflict:
+  tasks:
+    value: [1, 2, 4, 6, 8, 9]
+    source: definitional
+    why: "the single pick-and-place tasks: each has an object to grasp and a destination, so the four phases exist. Task 3 opens a drawer before its pick, tasks 0, 5 and 7 have no pick"
+  sources:
+    value: [agentview, wrist, proprio]
+    source: definitional
+    why: "the three observation inputs of OFT besides the instruction"
+  captures:
+    value: {exploratory: "results/clean_capture/identity-agentview+wrist__ins-own__rep0", confirmatory: "results/corruption_sweep/identity-agentview+wrist__ins-own__rep1"}
+    source: definitional
+    why: "the clean captured rollouts of each split (the held-out ones are the clean repeat, as in the patching study); successful episodes only, so all four phases are reached"
+  phases:
+    value: "from the executed clean chunks: g = first chunk whose gripper output has chunk mean < 0.5, r = first later chunk with mean >= 0.5 (or the last query if the gripper never reopens); approach = g - 2, pregrasp = g - 1, transport = g + floor((r - g) / 2), place = r - 1; an episode is used if g >= 2 and r - g >= 3"
+    source: rule
+    why: "the policy's own grasp and release commands mark the phases; no hand labels. Pregrasp is the last query before the closing chunk: at g itself the fingers already surround the object in most episodes, so moving the object or closing the gripper interpenetrates (exploratory check 2026-11-17: valid in 70% and 10% of states at g, 100% and 87% at g - 1)"
+  edits:
+    value: {object: "the manipulated object (approach, pregrasp) or the destination (transport, place) moved 5 cm horizontally", distractor: "a movable object outside the task moved 5 cm horizontally (relevance control, same distance)", arm: "the end effector moved 3 cm horizontally at fixed orientation; at transport and place the held object moves with it", gripper: "an open gripper rendered closed, a closed one rendered open", stale: "the captured observation of the previous query (8 control steps, 0.4 s earlier)"}
+    source: rule
+    why: "one physical fact changes per world; 5 cm is about one object radius, 3 cm is the proprio offset of the study plan; the stale world needs no rendering (both are captured observations)"
+  directions:
+    value: "8 horizontal directions at 45 degrees, tried in the order of a permutation seeded by derive_seed('sensor_conflict', edit, episode key, phase); the first that adds no contact deeper than 3 mm is used; for the distractor the object is the first in a seeded permutation of the non-task movable objects with a valid direction"
+    source: rule
+    why: "random but reproducible directions, and no worlds with objects inside each other"
+  max_penetration_m: {value: 0.003, source: rule, why: "contacts deeper than this that were not in the base state invalidate an edit"}
+  vision_conditions:
+    value: [identity, blur-8, noise-128]
+    source: rule
+    why: "the arm world is also queried with both cameras corrupted by the two global patching corruptions (same draws in both worlds), to ask whether degraded vision shifts trust towards proprio"
+  share:
+    value: "sources S of an edit; for each subset T of S, a_T = the normalized chunk with the sources in T taken from the edited world and the others from the real one (arm dims); Delta = a_S - a_empty; v(T) = <a_T - a_empty, Delta> / |Delta|^2; share phi_m = Shapley value of m in v (sums to 1). Aggregate per edit and phase: sum_e phi_m(e) |Delta_e|^2 / sum_e |Delta_e|^2 over episodes e"
+    source: definitional
+    why: "phi_m is the part of the policy's response to the changed world that follows source m; weighting by |Delta|^2 keeps states where the policy barely responds from dominating a ratio"
+  off_axis:
+    value: "for a single-source conflict T = {m}: r = (a_T - a_empty) - v(T) Delta; off-axis = sqrt(sum_e |r_e|^2 / sum_e |Delta_e|^2)"
+    source: definitional
+    why: "how far a conflicting input pushes the action in directions that neither the real nor the edited world calls for"
+  probe:
+    value: "readout positions' mean residual state at layers 8, 16 and 24 for every input of the object, arm and gripper edits; label 1 = inputs mixing two worlds, 0 = the real or the edited world; standardized logistic regression (L2, C = 1) trained on exploratory states, AUROC on held-out states; layer 16 is the primary"
+    source: rule
+    why: "whether the policy's own state reveals that its inputs disagree, before it acts"
+  patching:
+    value: "phases pregrasp and transport; conflicts {agentview only, wrist only} of the object edit and {proprio only} of the arm edit; single-point patches of the conflicting source's positions, the instruction positions and the readout positions with the real run's states, at every point of patching.layer_grid; removed share = 1 - <a_patched - a_empty, s> / |s|^2 with s = a_T - a_empty"
+    source: rule
+    why: "single-point patches (not prefix clamps, which reproduce the real run by construction) show at which depth the conflicting evidence leaves its own positions and reaches the positions the action head reads"
+  tests:
+    value: "held-out, stratified episode bootstrap (strata = task) with n_boot draws, two-sided bootstrap p; Holm within each family: (A) object edit, phi_wrist - phi_agentview != 0 at each of 4 phases; (B) arm edit, phi_proprio != 0 at each of 4 phases; (C) gripper edit, phi_proprio != 0 at each of 4 phases; (D) relevance, mean log(|Delta_object| / |Delta_distractor|) > 0 at each of 4 phases; (E) arm edit, phi_proprio(corrupted) - phi_proprio(clean) != 0 for blur-8 and noise-128, pooled over phases; (F) probe AUROC > 0.5 at layer 16. Shares of the stale edit, off-axis values, gripper flips and the patching curves are descriptive"
+    source: rule
+    why: "every test compares an estimate with its interval on a fixed null; nothing is chosen after seeing held-out data"
+  faults:
+    value: {none: "plain policy (paired reference)", proprio_offset: "the reported end-effector position is 3 cm off in a horizontal direction fixed per episode (seeded)", gripper_stuck: "the reported finger positions stay at their post-settle (open) values", lag_agentview: "the third-person frame of the previous query", lag_wrist: "the wrist frame of the previous query", lag_proprio: "the proprio of the previous query", lag_all: "the whole observation of the previous query (0.4 s latency)"}
+    source: rule
+    why: "closed-loop versions of the conflicts: a miscalibrated or stuck sensor, one camera out of sync, plain latency; at the first query the previous observation is the current one"
+  phase_faults:
+    value: {freeze_approach: "trigger: first query with the end effector within 15 cm of the object to grasp", freeze_grasp: "trigger: the query whose chunk first commands closing (gripper chunk mean < 0.5)", freeze_transport: "trigger: three queries after the grasp trigger", freeze_place: "trigger: first query from the grasp on with the object within 15 cm (horizontal) of the goal region (second argument of the goal predicate)"}
+    source: rule
+    why: "the same observation freeze (the trigger query's observation is fed again at the next two queries, up to 0.8 s stale) placed at four phases, on the pick-and-place tasks; positions are read from the simulator, so the trigger does not depend on what the policy sees. Thresholds from exploratory clean rollouts (2026-11-17): at 10 cm the place trigger fired only at the last query"
+  closed_loop_tests:
+    value: "held-out init states; faults on all 10 tasks, phase faults on sensor_conflict.tasks; success and unsafe outcome (oracle classes) against the paired 'none' run: exact McNemar, Holm over faults within each table; differences with stratified cluster-bootstrap intervals"
+    source: rule
+    why: "the same paired design as the corruption sweep"
