@@ -1,5 +1,7 @@
 """Closed-loop sensor faults (vlamech.interventions.sensor_faults) with a stand-in policy and simulator."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -93,3 +95,15 @@ def test_counterfactual_worlds_render_and_restore(goal_env):
     assert np.allclose(frames[2].proprio[:3] - f0.proprio[:3], [0.03, 0, 0], atol=1e-3) and arm.detail["ik_error_m"] < 1e-3
     assert grip.detail["from"] == "open" and frames[3].proprio[6] - frames[3].proprio[7] < 0.01
     assert np.array_equal(W.render(goal_env, base).agentview, f0.agentview)  # model edits are undone
+
+
+def test_delay_feeds_the_frame_k_steps_back():
+    f = SensorFault("delay_2")
+    _bind(f)
+    pol = FakePolicy()
+    for step in range(20):
+        imgs, p = _obs(step)
+        if step % 8 == 0:
+            f(pol, imgs, p, "do it")
+        f.observe(step, SimpleNamespace(agentview=imgs["agentview"], wrist=imgs["wrist"], proprio=p), None, False, {})
+    assert [int(a[0, 0, 0]) for a, _, _ in pol.fed] == [0, 6, 14]

@@ -10,6 +10,8 @@ because the phase triggers read object and hand positions from the simulator (ne
   proprio_offset  reported end-effector position off by 3 cm in a horizontal direction seeded per episode
   gripper_stuck   reported finger positions held at the first query's values (open after the settle steps)
   lag_<source>    that source from the previous query (agentview, wrist, proprio, or all of them)
+  delay_<k>       the whole observation of control step t - k at the query at step t (k steps of 0.05 s; frames
+                  before the first are the first frame); needs observe() called at every control step (closed_loop does)
   freeze_<phase>  the trigger query's whole observation fed again at the next two queries. Triggers, checked after each
                   query: approach = hand within 15 cm of the object to grasp; grasp = the query whose chunk first commands
                   closing; transport = three queries later; place = after the grasp, the object within 15 cm (horizontal)
@@ -31,12 +33,14 @@ FREEZE_QUERIES = 2
 GRIP_CLOSED_BELOW = 0.5
 FAULTS = ("none", "proprio_offset", "gripper_stuck", "lag_agentview", "lag_wrist", "lag_proprio", "lag_all")
 PHASE_FAULTS = ("freeze_approach", "freeze_grasp", "freeze_transport", "freeze_place")
+DELAY_STEPS = (2, 4, 8, 16)  # 0.1, 0.2, 0.4, 0.8 s at 20 Hz
+DELAY_FAULTS = tuple(f"delay_{k}" for k in DELAY_STEPS)
 
 
 class SensorFault:
     def __init__(self, name: str):
-        if name not in FAULTS + PHASE_FAULTS:
-            raise ValueError(f"unknown sensor fault {name!r}; known: {FAULTS + PHASE_FAULTS}")
+        if name not in FAULTS + PHASE_FAULTS + DELAY_FAULTS:
+            raise ValueError(f"unknown sensor fault {name!r}; known: {FAULTS + PHASE_FAULTS + DELAY_FAULTS}")
         self.name = name
         self.env, self.key = None, None
         self.reset()
@@ -59,6 +63,14 @@ class SensorFault:
         self.grasp_q: Optional[int] = None
         self.trigger_q: Optional[int] = None
         self.held: Optional[tuple] = None
+        self.frames: dict = {}  # control step -> (agentview, wrist, proprio), filled by observe()
+
+    def observe(self, step, frame, fed, fresh, goals) -> None:
+        """frame_hook: record every control step's observation (for delay_<k>)."""
+        if self.name.startswith("delay_"):
+            self.frames[step] = (frame.agentview, frame.wrist, np.array(frame.proprio, np.float64))
+            for old in [t for t in self.frames if t < step - 2 * DELAY_STEPS[-1]]:
+                del self.frames[old]
 
     # ------------------------------------------------------------------ phase triggers (simulator positions)
     def _pos(self, entity: str) -> np.ndarray:
@@ -106,6 +118,13 @@ class SensorFault:
             for s in which:
                 fed[SOURCES.index(s)] = prev[SOURCES.index(s)]
             active = self.prev is not None
+        elif self.name.startswith("delay_"):
+            step = max(self.frames) + 1 if self.frames else 0  # observe() has seen every step before this query
+            k = int(self.name.split("_")[1])
+            if step - k >= 0 and (step - k) in self.frames:
+                fed, active = list(self.frames[step - k]), True
+            elif step > 0:
+                fed, active = list(self.frames[min(self.frames)]), True
         elif self.name in PHASE_FAULTS and self.held is not None and self.q <= self.trigger_q + FREEZE_QUERIES:
             fed, active = list(self.held), True
         out = policy.forward(policy.prepare(fed[0], fed[1], fed[2], instruction))

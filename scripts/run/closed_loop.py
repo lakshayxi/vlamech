@@ -84,6 +84,16 @@ def _range(text: str, n: int) -> list[int]:
     return sorted(out)
 
 
+def _chain(*hooks):
+    hooks = [h for h in hooks if h is not None]
+
+    def hook(*args):
+        for h in hooks:
+            h(*args)
+
+    return hook
+
+
 def instruction_for(mode: str, task_id: int, suite) -> str:
     if mode == "own":
         return suite.get_task(task_id).language
@@ -244,6 +254,8 @@ def main(argv=None):
                 if args.record_video:
                     video, hook = rollout_video(handle.run_dir / "videos" / f"{key}.mp4", ins, spec.tag, suite,
                                                 task_id, settings, view_fn)
+                if hasattr(action_fn, "observe"):  # delay faults see every control step's frame
+                    hook = _chain(hook, action_fn.observe)
                 res, extra = run_episode(env, policy, init, corruptor, instruction=ins,
                                          mask_fn=env.masks if needs_masks else None, record_actions=args.record_actions,
                                          condition=spec.tag, max_steps=settings["env.max_steps"], chunk=chunk,
