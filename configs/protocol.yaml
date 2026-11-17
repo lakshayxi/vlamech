@@ -352,6 +352,10 @@ sensor_conflict:
     value: {freeze_approach: "trigger: first query with the end effector within 15 cm of the object to grasp", freeze_grasp: "trigger: the query whose chunk first commands closing (gripper chunk mean < 0.5)", freeze_transport: "trigger: three queries after the grasp trigger", freeze_place: "trigger: first query from the grasp on with the object within 15 cm (horizontal) of the goal region (second argument of the goal predicate)"}
     source: rule
     why: "the same observation freeze (the trigger query's observation is fed again at the next two queries, up to 0.8 s stale) placed at four phases, on the pick-and-place tasks; positions are read from the simulator, so the trigger does not depend on what the policy sees. Thresholds from exploratory clean rollouts (2026-11-17): at 10 cm the place trigger fired only at the last query"
+  followup:
+    value: "exploratory, decided after the first closed-loop results (2026-11-17), pick-and-place tasks, init states 20-29, 60 paired episodes per arm: the fresh and random wrist rescue at layers 4, 8, 12, 16, 20, 24, 28; mitigations of the late wrist camera that use only data that has arrived (lag_wrist_warp: the late frame reprojected to the current camera pose on the table plane z = 0.92 m with the gripper's pixels kept; lag_wrist_slow: commanded motion halved; lag_wrist_waitopen: hold still for 8 steps before a query while the gripper is open; lag_wrist_wait and delay_8_wait: hold still before every query); arms that slow the robot get 600 steps"
+    source: rule
+    why: "tests whether layer 12 is special and whether the late wrist camera can be handled without the missing frame; the table height was fitted on calibration frames of random hand motion, not on any rollout of these runs"
   closed_loop_tests:
     value: "held-out init states; faults on all 10 tasks, phase faults on sensor_conflict.tasks; success and unsafe outcome (oracle classes) against the paired 'none' run: exact McNemar, Holm over faults within each table; differences with stratified cluster-bootstrap intervals"
     source: rule

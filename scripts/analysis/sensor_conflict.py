@@ -264,7 +264,8 @@ FIRST = QUICK["faults"]  # the fault and rescue tables (and their Holm families)
 SWEEP = (4, 8, 12, 16, 20, 24, 28)
 MITIGATIONS = (("lag_wrist_warp", "lag_wrist"), ("lag_wrist_slow", "lag_wrist"), ("lag_wrist_waitopen", "lag_wrist"),
                ("lag_wrist_wait", "lag_wrist"), ("delay_8_wait", "delay_8"))
-QUICK["faults"] += tuple(m for m, _ in MITIGATIONS) + tuple(f"rescue_wrist_{l}{m}" for l in SWEEP if l != 12 for m in ("", "_random"))
+QUICK["faults"] += tuple(m for m, _ in MITIGATIONS) + tuple(f"rescue_wrist_{l}" for l in SWEEP if l != 12) + (
+    "rescue_wrist_4_random", "rescue_wrist_24_random")  # random donors at layers 4, 12 and 24 only (time)
 MAX_STEPS = 300
 # paired contrasts for the rescue controls (one Holm family): (better-if-higher arm, reference arm)
 CONTRASTS = (("rescue_wrist_12", "rescue_wrist_12_samephase"), ("rescue_wrist_12_samephase", "rescue_wrist_12_otherphase"),
@@ -831,9 +832,9 @@ def _followup_fig(plt, s):
             ax.errorbar(x, y, yerr=[y - ci[:, 0], ci[:, 1] - y], color=col, lw=1.8, marker="o", ms=6, mec=SURF,
                         capsize=0, elinewidth=1, label=lab)
     ax.axhline(none["success"], color=INK, lw=0.9, ls="--")
-    ax.text(28.5, none["success"] + 0.02, "plain", fontsize=7.5, color=INK, ha="right", va="bottom")
+    ax.text(28.5, none["success"] + 0.015, "plain", fontsize=7.5, color=INK, ha="right", va="bottom")
     ax.axhline(r["delayed_success"], color=COLORS["wrist"], lw=0.9, ls="--")
-    ax.text(28.5, r["delayed_success"] + 0.02, "wrist 0.4 s late", fontsize=7.5, color=COLORS["wrist"], ha="right", va="bottom")
+    ax.text(3.6, r["delayed_success"] - 0.02, "wrist 0.4 s late, no patch", fontsize=7.5, color=COLORS["wrist"], ha="left", va="top")
     ax.set_xticks(list(SWEEP))
     ax.set_ylim(0, 1.05)
     ax.set_xlabel("layer whose wrist-token states are replaced", fontsize=8, color=INK)
@@ -900,7 +901,7 @@ def _followup_fig(plt, s):
     ax.set_xlabel("share of the 60 paired episodes", fontsize=8, color=INK)
     ax.legend(frameon=False, fontsize=7, loc="upper center", ncol=3, bbox_to_anchor=(0.45, -0.14))
     ax.set_title("(c) how episodes end", fontsize=9, color=INK, loc="left")
-    fig.tight_layout(w_pad=2.5)
+    fig.tight_layout(w_pad=0.5)
     fig.savefig(FIG / "followup.png", dpi=250, bbox_inches="tight", facecolor=SURF)
     plt.close(fig)
 

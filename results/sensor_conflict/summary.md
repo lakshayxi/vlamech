@@ -179,3 +179,79 @@ Paired contrasts between arms (first minus second; Holm over the contrasts):
 
 No-op check: putting the stale states back reproduces the unpatched delayed run in 60/60 episodes (same outcome and same number of steps).
 
+## Rescue by layer (second follow-up, exploratory)
+
+The same rescue of the 0.4 s late wrist camera with the wrist positions' states replaced at one layer, from the fresh frame or from another episode (random). Paired against the delayed run; Holm over this table.
+
+| layer | donor | n | success [95% Wilson] | vs delayed [95% CI] | p (Holm) | unsafe |
+|---|---|---|---|---|---|---|
+| 4 | fresh | 60 | 0.967 [0.89, 0.99] | 0.650 [0.550, 0.750] | 3.44e-10 | 0.033 |
+| 8 | fresh | 60 | 0.967 [0.89, 0.99] | 0.650 [0.550, 0.733] | 3.44e-10 | 0.000 |
+| 12 | fresh | 60 | 0.950 [0.86, 0.98] | 0.633 [0.533, 0.733] | 7.28e-11 | 0.017 |
+| 16 | fresh | 60 | 0.717 [0.59, 0.81] | 0.400 [0.267, 0.517] | 5.06e-05 | 0.150 |
+| 20 | fresh | 60 | 0.600 [0.47, 0.71] | 0.283 [0.150, 0.417] | 0.00364 | 0.217 |
+| 24 | fresh | 60 | 0.467 [0.35, 0.59] | 0.150 [0.050, 0.250] | 0.105 | 0.283 |
+| 28 | fresh | 60 | 0.367 [0.26, 0.49] | 0.050 [-0.033, 0.133] | 0.453 | 0.400 |
+| 4 | random | 60 | 0.817 [0.70, 0.89] | 0.500 [0.367, 0.617] | 4.23e-06 | 0.083 |
+| 12 | random | 60 | 0.717 [0.59, 0.81] | 0.400 [0.283, 0.517] | 0.000348 | 0.083 |
+| 24 | random | 60 | 0.450 [0.33, 0.58] | 0.133 [0.033, 0.233] | 0.115 | 0.317 |
+
+## Mitigations that use only data that has arrived (second follow-up, exploratory)
+
+The input stays 0.4 s late. lag_wrist_*: only the wrist camera is late (as in the rescue); delay_8_wait: every source is late (as in delay_8).
+
+- warp: the late wrist frame reprojected to the current camera pose (from fresh proprio) on the table plane.
+- slow: every commanded motion halved.
+- waitopen: hold still for 8 steps before a query only while the fresh finger reading says the gripper is open.
+- wait: hold still for 8 steps before every query, so the late frame shows the scene as it is.
+
+Arms that slow the robot get 600 steps; 'within 300' counts only successes inside the normal budget. Paired against the late run without mitigation and against the plain run; exact McNemar, uncorrected.
+
+| arm | late run success | success | within 300 | vs late [95% CI] | p | vs plain [95% CI] | p | unsafe (late run) | vs late [95% CI] | median steps of a success (plain) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| lag_wrist_warp | 0.317 | 0.950 | 0.950 | 0.633 [0.533, 0.733] | 7.28e-12 | -0.017 [-0.083, 0.050] | 1 | 0.033 (0.417) | -0.383 [-0.467, -0.300] | 98.0 (88.5) |
+| lag_wrist_slow | 0.317 | 0.917 | 0.917 | 0.600 [0.500, 0.700] | 1.49e-09 | -0.050 [-0.133, 0.033] | 0.453 | 0.017 (0.417) | -0.400 [-0.467, -0.333] | 161.0 (88.5) |
+| lag_wrist_waitopen | 0.317 | 0.883 | 0.833 | 0.567 [0.467, 0.667] | 1.16e-10 | -0.083 [-0.150, 0.000] | 0.18 | 0.083 (0.417) | -0.333 [-0.417, -0.250] | 135.0 (88.5) |
+| lag_wrist_wait | 0.317 | 0.883 | 0.883 | 0.567 [0.467, 0.667] | 5.65e-08 | -0.083 [-0.167, -0.017] | 0.125 | 0.033 (0.417) | -0.383 [-0.450, -0.317] | 154.0 (88.5) |
+| delay_8_wait | 0.117 | 0.967 | 0.967 | 0.850 [0.767, 0.933] | 8.88e-16 | 0.000 [-0.067, 0.067] | 1 | 0.017 (0.417) | -0.400 [-0.467, -0.333] | 170.5 (88.5) |
+
+## How episodes end (second follow-up, exploratory)
+
+From the saved traces, with rough cut-offs chosen after the runs: another task's goal became true; the object to grasp was raised more than 3 cm but not placed; moved more than 2 cm but not raised; or barely moved. The unsafe outcome is a collision above the task's clean maximum force or an object off the table; 'bumped' counts episodes where an object outside the task moved more than 2 cm (not part of the unsafe outcome).
+
+| run | n | success | other task | lifted, not placed | moved, not lifted | never moved it | collision | off table | bumped |
+|---|---|---|---|---|---|---|---|---|---|
+| none | 60 | 58 | 1 | 0 | 0 | 1 | 1 | 0 | 1 |
+| delay_2 | 60 | 55 | 0 | 2 | 2 | 1 | 5 | 0 | 3 |
+| delay_4 | 60 | 22 | 4 | 9 | 10 | 15 | 18 | 0 | 9 |
+| delay_8 | 60 | 7 | 2 | 19 | 3 | 29 | 25 | 0 | 20 |
+| delay_16 | 60 | 1 | 1 | 7 | 4 | 47 | 22 | 0 | 23 |
+| lag_agentview | 60 | 47 | 5 | 2 | 3 | 3 | 5 | 0 | 4 |
+| lag_wrist | 60 | 19 | 3 | 8 | 5 | 25 | 25 | 0 | 13 |
+| lag_proprio | 60 | 59 | 0 | 1 | 0 | 0 | 4 | 0 | 2 |
+| lag_all | 60 | 7 | 2 | 19 | 3 | 29 | 25 | 0 | 20 |
+| proprio_offset | 60 | 58 | 0 | 1 | 0 | 1 | 1 | 0 | 1 |
+| gripper_stuck | 60 | 4 | 0 | 18 | 33 | 5 | 15 | 0 | 20 |
+| freeze_transport | 60 | 35 | 4 | 20 | 0 | 1 | 7 | 0 | 1 |
+| rescue_wrist_12 | 60 | 57 | 0 | 0 | 3 | 0 | 1 | 0 | 2 |
+| rescue_readout_20 | 60 | 52 | 1 | 4 | 2 | 1 | 4 | 0 | 3 |
+| rescue_wrist_12_random | 60 | 43 | 0 | 7 | 0 | 10 | 5 | 0 | 0 |
+| rescue_readout_20_random | 60 | 42 | 1 | 5 | 3 | 9 | 9 | 0 | 5 |
+| rescue_wrist_12_samephase | 60 | 48 | 0 | 5 | 3 | 4 | 5 | 0 | 3 |
+| rescue_wrist_12_otherphase | 60 | 25 | 0 | 3 | 2 | 30 | 22 | 0 | 4 |
+| rescue_wrist_12_noise | 60 | 25 | 2 | 7 | 13 | 13 | 19 | 0 | 11 |
+| rescue_wrist_12_noop | 60 | 19 | 3 | 8 | 5 | 25 | 25 | 0 | 13 |
+| lag_wrist_warp | 60 | 57 | 0 | 1 | 0 | 2 | 2 | 0 | 3 |
+| lag_wrist_slow | 60 | 55 | 1 | 3 | 0 | 1 | 1 | 0 | 0 |
+| lag_wrist_waitopen | 60 | 53 | 0 | 7 | 0 | 0 | 5 | 0 | 0 |
+| lag_wrist_wait | 60 | 53 | 1 | 6 | 0 | 0 | 2 | 0 | 0 |
+| delay_8_wait | 60 | 58 | 0 | 2 | 0 | 0 | 1 | 0 | 0 |
+| rescue_wrist_4 | 60 | 58 | 1 | 0 | 0 | 1 | 2 | 0 | 1 |
+| rescue_wrist_8 | 60 | 58 | 0 | 0 | 1 | 1 | 0 | 0 | 2 |
+| rescue_wrist_16 | 60 | 43 | 2 | 6 | 5 | 4 | 9 | 0 | 2 |
+| rescue_wrist_20 | 60 | 36 | 2 | 7 | 7 | 8 | 13 | 0 | 2 |
+| rescue_wrist_24 | 60 | 28 | 4 | 6 | 6 | 16 | 17 | 0 | 11 |
+| rescue_wrist_28 | 60 | 22 | 2 | 7 | 8 | 21 | 24 | 0 | 16 |
+| rescue_wrist_4_random | 60 | 49 | 0 | 7 | 1 | 3 | 5 | 0 | 1 |
+| rescue_wrist_24_random | 60 | 27 | 5 | 4 | 11 | 13 | 19 | 0 | 8 |
+

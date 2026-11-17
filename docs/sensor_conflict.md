@@ -97,6 +97,29 @@ The full plan above was cut for time, and everything reported is **exploratory**
   (same-phase donors) and state-specific information (the fresh state). See `results/sensor_conflict/summary.md`.
 - **Tests:** the tests above are computed on these reduced samples. P-values are Holm-corrected within each table
   only, not across the whole follow-up.
+- **Second follow-up, same 60 paired episodes, also exploratory and decided after the results above:**
+  - *Rescue by layer:* the fresh-frame and random-donor wrist rescues at layers 4 to 28 (`rescue_wrist_<layer>[_random]`),
+    to test whether layer 12 is special.
+  - *Mitigations that use only data that has arrived:* the wrist frame of the previous query, fresh proprio and the
+    camera pose that forward kinematics gives from it. There are four arms:
+    - `lag_wrist_warp`: the late wrist frame reprojected to the current camera pose on the table plane (z = 0.92 m,
+      fitted on calibration frames), keeping the gripper's own pixels (`assets/wrist_gripper_mask.npz`,
+      `scripts/setup/wrist_gripper_mask.py`).
+    - `lag_wrist_slow`: every commanded motion halved.
+    - `lag_wrist_waitopen`: the robot holds still for 8 steps before a query only while the gripper is open.
+    - `lag_wrist_wait`, `delay_8_wait`: the robot holds still before every query.
+
+    Arms that slow the robot get 600 steps; success within the normal 300 is reported too.
+  - *How episodes end:* every closed-loop episode is classified from its trace. The classes are: another task's goal;
+    object lifted but not placed; moved but not lifted; barely moved. The cut-offs (3 cm, 2 cm) were chosen after the
+    runs. The unsafe outcome is broken into collisions and objects off the table.
+  - **Result:**
+    - The fresh-frame patch rescues at layers 4 to 12 (95 to 97%) and fades from layer 16 on (72% down to 37%), so
+      layer 12 is not special.
+    - The warped late frame restores 95% success with about the plain run's speed (median 98 steps against 88).
+      Halving the speed (92%) and holding still before queries (88%; 97% when every sensor is late) also work, but
+      take 1.5 to 2 times as long.
+    - Failures under delay are mostly botched grasps, not wrong goals.
 
 ## Running
 

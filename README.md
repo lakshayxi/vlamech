@@ -252,6 +252,34 @@ This is a causal test, not a fix: it needs the fresh frame.
 
 <p align="center"><img src="results/figures/sensor_conflict/rescue.png" width="95%"></p>
 
+**Second follow-up (exploratory, same 60 paired episodes).** Can the late wrist camera be handled without the missing
+frame, and is layer 12 special?
+
+| wrist camera 0.4 s late, plus | success | median steps of a success |
+|---|---|---|
+| nothing | 32% | 154 |
+| late frame warped to the current camera pose | 95% | 98 |
+| every motion at half speed | 92% | 161 |
+| hold still 0.4 s before each query, only before the grasp | 88% | 135 |
+| hold still 0.4 s before every query | 88% | 154 |
+| (plain run, fresh camera) | 97% | 88 |
+
+- **Warp:** the late frame is reprojected to where the camera is now, which forward kinematics gives from the fresh
+  joint readings. It assumes everything lies on the table plane and keeps the gripper's own pixels. This brings
+  success back to the plain level without slowing the robot.
+- **Waiting:** holding still lets the late frame catch up. It also works when every sensor is 0.4 s late (12% to
+  97%), at about twice the time.
+- **Layer sweep:** the fresh-frame patch works at layers 4 to 12 (95 to 97%) and fades after layer 16 (72%, 60%,
+  47%, 37%). Layer 12 is not special: the patch works until the wrist evidence has left the wrist tokens.
+- **How failures happen:** failures under delay are botched execution, not a wrong goal. With the wrist camera late,
+  25 of 41 failures never move the object, 8 lift it without placing it, and 3 meet another task's goal. Every
+  unsafe outcome is a high-force collision; no object left the table.
+
+The table height of the warp was fitted on calibration frames. Everything runs in simulation, where the camera pose
+from kinematics is exact; on a real robot calibration error would add to it.
+
+<p align="center"><img src="results/figures/sensor_conflict/followup.png" width="98%"></p>
+
 <p align="center"><img src="results/figures/sensor_conflict/delay_ladder.png" width="45%"> <img src="results/figures/sensor_conflict/patching_delay.png" width="53%"></p>
 
 <p align="center"><img src="results/figures/sensor_conflict/shares.png" width="95%"></p>
