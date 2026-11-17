@@ -11,7 +11,7 @@ What you can change: number of bootstrap replicates (n_boot), CI level, strata /
 """
 from __future__ import annotations
 
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -60,8 +60,12 @@ def hierarchical_bootstrap(
     n_boot: int = 10_000,
     seed: int = 0,
     alpha: float = 0.05,
+    null: Optional[float] = None,
 ) -> dict:
     """Percentile CI by resampling clusters with replacement, optionally within fixed strata.
+
+    null: if given, also a two-sided bootstrap p-value for the estimate against it (twice the smaller share of
+        replicates on either side of the null, at most 1; the inversion of the percentile interval).
 
     strata: columns whose units are fixed (every stratum appears exactly once in every replicate).
         LIBERO tasks are a fixed set, not a sample from a population of tasks, so the primary analysis
@@ -92,8 +96,11 @@ def hierarchical_bootstrap(
         raise FloatingPointError(f"statistic undefined in {n_bad}/{n_boot} bootstrap replicates; "
                                  "the estimand is not well defined for this data (do not drop replicates silently)")
     lo, hi = np.quantile(reps, [alpha / 2, 1 - alpha / 2])
-    return {"estimate": point, "ci_low": float(lo), "ci_high": float(hi), "n_boot": n_boot,
-            "se": float(np.std(reps, ddof=1)), "strata": list(strata), "levels": list(levels)}
+    out = {"estimate": point, "ci_low": float(lo), "ci_high": float(hi), "n_boot": n_boot,
+           "se": float(np.std(reps, ddof=1)), "strata": list(strata), "levels": list(levels)}
+    if null is not None:
+        out["p_boot"] = float(min(1.0, 2 * min((reps <= null).mean(), (reps >= null).mean()) + 1 / n_boot))
+    return out
 
 
 def _nest(sub: pd.DataFrame, pos: np.ndarray, levels: list[str]):

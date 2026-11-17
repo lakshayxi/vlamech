@@ -128,3 +128,16 @@ def test_invalid_inputs_raise_instead_of_fabricating_results():
     with pytest.raises(ValueError):
         wilson_ci(3, 0)
     assert np.isnan(auroc([0.1, 0.2], [1, 1]))  # one class: explicitly undefined
+
+
+def test_bootstrap_p_value_against_a_null():
+    import pandas as pd
+
+    from vlamech.metrics.stats import hierarchical_bootstrap
+
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"task": np.repeat(range(5), 20), "init_state": np.tile(range(20), 5),
+                       "x": rng.normal(1.0, 1.0, 100)})
+    far = hierarchical_bootstrap(df, lambda d: d.x.mean(), n_boot=2000, null=0.0)
+    near = hierarchical_bootstrap(df, lambda d: d.x.mean(), n_boot=2000, null=1.0)
+    assert far["p_boot"] < 0.01 and near["p_boot"] > 0.2
