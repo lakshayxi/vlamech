@@ -228,6 +228,20 @@ In closed loop, with 60 paired pick-and-place episodes per row, plain success is
 - **Stuck gripper reading:** the robot closes on the object but lifts it in only 37% of episodes (98% plain). It then waits, as if the grasp never happened.
 - **Patching** (30 episodes): a late camera's evidence moves from its own tokens to the action-readout positions between layers 12 and 24, earlier for the wrist. A late proprio reading stays on its token until layer 20, then jumps to the readout. The instruction positions carry almost none of it.
 
+**Patching rescue:** the wrist camera is 0.4 s late, and one layer's states are restored in closed loop.
+
+| arm | success |
+|---|---|
+| plain run / delayed wrist, no patch | 97% / 32% |
+| wrist positions @ layer 12, the episode's own fresh frame | 95% |
+| readout positions @ layer 20, the episode's own fresh frame | 87% |
+| the same two patches with another episode's states (random donor) | 72% / 70% |
+
+Replacing the stale wrist states with any in-distribution states already recovers a large part of the loss. The
+episode's own fresh states add 23 points at layer 12 (p = 0.003) and 17 points at the readout (p = 0.03). So
+repairing that layer's states is enough to bring task success back. This is a causal test, not a deployable fix: it
+needs the fresh frame.
+
 <p align="center"><img src="results/figures/sensor_conflict/delay_ladder.png" width="45%"> <img src="results/figures/sensor_conflict/patching_delay.png" width="53%"></p>
 
 <p align="center"><img src="results/figures/sensor_conflict/shares.png" width="95%"></p>

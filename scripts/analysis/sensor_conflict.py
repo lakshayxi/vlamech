@@ -255,7 +255,9 @@ def patching() -> dict:
 # ------------------------------------------------------------------------------------------------- closed loop
 QUICK = {"dir": ROOT / "results" / "debug", "states": range(20, 30),
          "faults": ("none", "delay_2", "delay_4", "delay_8", "delay_16", "lag_agentview", "lag_wrist", "lag_proprio",
-                    "lag_all", "proprio_offset", "gripper_stuck", "freeze_transport")}
+                    "lag_all", "proprio_offset", "gripper_stuck", "freeze_transport", "rescue_wrist_12", "rescue_readout_20",
+                    "rescue_wrist_12_random", "rescue_readout_20_random")}
+RESCUES = QUICK["faults"][-4:]
 DELAY_S = {"none": 0.0, "delay_2": 0.1, "delay_4": 0.2, "delay_8": 0.4, "delay_16": 0.8}
 
 
@@ -293,7 +295,8 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
             rd = load_run(d, keys)
         except FileNotFoundError:
             missing.append(f); continue
-        if not rd.complete:
+        clean_but_dirty = quick and not (rd.missing or rd.errored_only or rd.conflicts or rd.unexpected or rd.foreign_stamps)
+        if not rd.complete and not clean_but_dirty:  # quick runs are debug runs: an uncommitted tree is allowed
             if not partial:
                 rd.require_complete()
             missing.append(f)  # partial: paired on the episodes finished so far
@@ -337,6 +340,31 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
                 for (f, _), p in zip(lst, holm([p for _, p in lst])):
                     res[f][f"{m}_p_holm"] = float(p)
         out[table] = res
+    if quick and "lag_wrist" in runs:  # rescue arms against the unpatched delayed wrist camera, paired
+        base = df[df.fault == "lag_wrist"].set_index(["task", "init_state"])
+        res, ps = {}, []
+        for f in RESCUES:
+            if f not in runs:
+                continue
+            j = base.join(df[df.fault == f].set_index(["task", "init_state"]), lsuffix="_0", rsuffix="_1", how="inner").reset_index()
+            mc = mcnemar_exact(j.success_0.to_numpy(), j.success_1.to_numpy())
+            b = boot(j, lambda d: float(d.success_1.mean() - d.success_0.mean()))
+            res[f] = {"n": int(len(j)), "success": float(j.success_1.mean()), "unsafe": float(j.unsafe_1.mean()),
+                      "success_vs_delayed": [b["estimate"], b["ci_low"], b["ci_high"]], "p": mc["p"]}
+            ps.append(mc["p"])
+        for f, p in zip(res, holm(ps) if ps else []):
+            res[f]["p_holm"] = float(p)
+        fresh = {}
+        for f in ("rescue_wrist_12", "rescue_readout_20"):
+            if f in runs and f"{f}_random" in runs:
+                x = df[df.fault == f"{f}_random"].set_index(["task", "init_state"])
+                j = x.join(df[df.fault == f].set_index(["task", "init_state"]), lsuffix="_0", rsuffix="_1", how="inner").reset_index()
+                mc = mcnemar_exact(j.success_0.to_numpy(), j.success_1.to_numpy())
+                b = boot(j, lambda d: float(d.success_1.mean() - d.success_0.mean()))
+                fresh[f] = {"diff": [b["estimate"], b["ci_low"], b["ci_high"]], "p": mc["p"]}
+        for f, p in zip(fresh, holm([v["p"] for v in fresh.values()]) if fresh else []):
+            fresh[f]["p_holm"] = float(p)
+        out["rescue"] = {"delayed_success": float(base.success.mean()), "arms": res, "fresh_vs_random": fresh}
     return out
 
 
@@ -430,6 +458,17 @@ def report(s: dict) -> str:
                      f"{e['unsafe']:.3f} | {fmt(e['unsafe_diff'], 3)} | {e.get('unsafe_p_holm', float('nan')):.3g} | "
                      f"{e['speed']:.1f} ({e['speed_plain']:.1f}) | {e['reversal']:.2f} ({e['reversal_plain']:.2f}) | "
                      f"{e['grasp_cycles']:.2f} ({e['grasp_cycles_plain']:.2f}) |")
+        L.append("")
+    if cl.get("rescue"):
+        r = cl["rescue"]
+        L += ["## Patching rescue of a 0.4 s late wrist camera (closed loop)", "",
+              f"Unpatched delayed wrist camera: success {r['delayed_success']:.3f}; plain run {cl['faults']['none']['success']:.3f}.", "",
+              "| arm | n | success | vs delayed [95% CI] | p (Holm) | unsafe |", "|---|---|---|---|---|---|"]
+        for f, e in r["arms"].items():
+            L.append(f"| {f} | {e['n']} | {e['success']:.3f} | {fmt(e['success_vs_delayed'], 3)} | {e.get('p_holm', float('nan')):.3g} | {e['unsafe']:.3f} |")
+        L.append("")
+        for f, e in r.get("fresh_vs_random", {}).items():
+            L.append(f"Fresh states against the random donor, {f}: {fmt(e['diff'], 3)}, p (Holm) {e['p_holm']:.3g}.")
         L.append("")
     if cl.get("missing"):
         L.append(f"Closed-loop runs not complete: {', '.join(cl['missing'])}.")
@@ -547,8 +586,32 @@ def _ladder_fig(plt, r):
     plt.close(fig)
 
 
+def _rescue_fig(plt, cl):
+    r = cl["rescue"]["arms"]
+    labels = ["plain", "wrist 0.4 s late"] + [f.replace("rescue_", "").replace("_random", " (random donor)").replace("_", " @ L")
+                                                for f in r]
+    vals = [cl["faults"]["none"]["success"], cl["rescue"]["delayed_success"]] + [e["success"] for e in r.values()]
+    cols = [MUTED, COLORS["wrist"]] + [COLORS["agentview"] if not f.endswith("random") else GRID for f in r]
+    fig, ax = plt.subplots(figsize=(6.4, 3.4), facecolor=SURF)
+    _style(ax)
+    y = np.arange(len(vals))[::-1]
+    ax.barh(y, vals, color=cols, height=0.7, edgecolor=SURF)
+    for yi, v in zip(y, vals):
+        ax.text(v + 0.01, yi, f"{v:.0%}", va="center", fontsize=8, color=INK)
+    ax.set_yticks(y, labels, fontsize=8)
+    ax.set_xlim(0, 1.1)
+    ax.grid(axis="y", visible=False)
+    ax.set_xlabel("task success (60 paired pick-and-place episodes)", fontsize=8, color=INK)
+    ax.set_title("restoring one layer's states with the fresh wrist frame", fontsize=9, color=INK)
+    fig.tight_layout()
+    fig.savefig(FIG / "rescue.png", dpi=200, bbox_inches="tight", facecolor=SURF)
+    plt.close(fig)
+
+
 def _closed_fig(plt, cl):
     _ladder_fig(plt, cl["faults"])
+    if cl.get("rescue", {}).get("arms"):
+        _rescue_fig(plt, cl)
     if True:
         tabs = [t for t in ("faults", "phase_faults") if t in cl]
         fig, axes = plt.subplots(1, len(tabs), figsize=(5.2 * len(tabs), 3.6), facecolor=SURF)
@@ -558,7 +621,7 @@ def _closed_fig(plt, cl):
             ax.grid(axis="y", visible=False)
             ax.grid(axis="x", color=GRID, lw=0.6)
             r = cl[t]
-            names = [f for f in r if f != "none"]
+            names = [f for f in r if f != "none" and not f.startswith("rescue")]
             y = np.arange(len(names))[::-1]
             for yi, f in zip(y, names):
                 e = r[f]["success_diff"]
