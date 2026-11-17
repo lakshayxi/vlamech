@@ -19,6 +19,7 @@ because the phase triggers read object and hand positions from the simulator (ne
   lag_wrist_wait  lag_wrist, but the robot holds still for one chunk (8 steps) before every query, so the late wrist
                   frame shows the scene as it is now; a recovery that uses only frames that have arrived. Holding
                   doubles the time, so the episode gets twice the step budget (step_factor)
+  delay_8_wait    the same for delay_8: every source 0.4 s late, the robot holds still for 8 steps before every query
 """
 from __future__ import annotations
 
@@ -38,7 +39,8 @@ FAULTS = ("none", "proprio_offset", "gripper_stuck", "lag_agentview", "lag_wrist
           "lag_wrist_wait")
 PHASE_FAULTS = ("freeze_approach", "freeze_grasp", "freeze_transport", "freeze_place")
 DELAY_STEPS = (2, 4, 8, 16)  # 0.1, 0.2, 0.4, 0.8 s at 20 Hz
-DELAY_FAULTS = tuple(f"delay_{k}" for k in DELAY_STEPS)
+DELAY_FAULTS = tuple(f"delay_{k}" for k in DELAY_STEPS) + ("delay_8_wait",)
+WAIT_FAULTS = ("lag_wrist_wait", "delay_8_wait")
 
 
 class SensorFault:
@@ -46,7 +48,7 @@ class SensorFault:
         if name not in FAULTS + PHASE_FAULTS + DELAY_FAULTS:
             raise ValueError(f"unknown sensor fault {name!r}; known: {FAULTS + PHASE_FAULTS + DELAY_FAULTS}")
         self.name = name
-        self.step_factor = 2 if name == "lag_wrist_wait" else 1
+        self.step_factor = 2 if name in WAIT_FAULTS else 1
         self.env, self.key = None, None
         self.reset()
 
@@ -110,7 +112,7 @@ class SensorFault:
             self.first_proprio = now[2].copy()
         fed = list(now)
         active = False
-        if self.name == "lag_wrist_wait" and self.q % 2 == 1:  # hold still: zero motion, keep the gripper command
+        if self.name in WAIT_FAULTS and self.q % 2 == 1:  # hold still: zero motion, keep the gripper command
             hold = np.zeros((8, 7))
             hold[:, 6] = self.last_action[6]
             self.prev = now
@@ -132,7 +134,7 @@ class SensorFault:
             active = self.prev is not None
         elif self.name.startswith("delay_"):
             step = max(self.frames) + 1 if self.frames else 0  # observe() has seen every step before this query
-            k = int(self.name.split("_")[1])
+            k = int(self.name.split("_")[1])  # delay_8_wait: 8
             if step - k >= 0 and (step - k) in self.frames:
                 fed, active = list(self.frames[step - k]), True
             elif step > 0:
