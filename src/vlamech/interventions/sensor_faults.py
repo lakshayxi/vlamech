@@ -142,29 +142,38 @@ class SensorFault:
 
 
 # ------------------------------------------------------------------------------------------------ patching rescue
-RESCUES = ("rescue_wrist_12", "rescue_readout_20", "rescue_wrist_12_random", "rescue_readout_20_random")
+RESCUE_MODES = ("fresh", "random", "samephase", "otherphase", "noise", "noop")
+RESCUES = ("rescue_wrist_12", "rescue_readout_20", "rescue_wrist_12_random", "rescue_readout_20_random",
+           "rescue_wrist_12_samephase", "rescue_wrist_12_otherphase", "rescue_wrist_12_noise", "rescue_wrist_12_noop")
 
 
 class Rescue(SensorFault):
-    """lag_wrist (the wrist frame of the previous query) with one layer's states at one token group put back.
+    """lag_wrist (the wrist frame of the previous query) with one layer's states at one token group replaced.
 
-    rescue_<group>_<layer>: the group's residual states at that layer are replaced by those of the same query with the
-    fresh wrist frame (a causal test, not a deployable fix: it needs the fresh frame). With _random, the states come
-    from another episode instead (same task, next held-out init state, its clean captured observation at the same
-    query, or its last one), the control for 'any in-distribution state helps'. Needs the in-process policy (hooks)."""
+    rescue_<group>_<layer>[_<mode>]; where the replacing states come from (a causal test, not a deployable fix):
+      fresh       the same query with the fresh wrist frame (needs the fresh frame)
+      random      another episode: same task, next held-out init state, its clean captured observation at the same query
+                  index (or its last)
+      samephase   the clean captured rollout of the same initial state at the same query index (or its last)
+      otherphase  that rollout half an episode away: query (q + n // 2) mod n of its n queries
+      noise       the stale states plus Gaussian noise whose norm over the group equals |fresh - stale| there (seeded)
+      noop        the stale states themselves (must reproduce lag_wrist exactly)
+    Captured donors are clean frames of the held-out clean run (protocol sensor_conflict.captures). Needs the
+    in-process policy (hooks)."""
 
     def __init__(self, name: str):
         if name not in RESCUES:
             raise ValueError(f"unknown rescue {name!r}; known: {RESCUES}")
         parts = name.split("_")
-        self.group, self.layer, self.random = parts[1], int(parts[2]), name.endswith("_random")
+        self.group, self.layer = parts[1], int(parts[2])
+        self.mode = parts[3] if len(parts) > 3 else "fresh"
         self.name = name
         self.env, self.key, self.donor_cap = None, None, None
         self.reset()
 
     def bind(self, env, key: str) -> None:
         self.env, self.key = env, key
-        if self.random:
+        if self.mode in ("random", "samephase", "otherphase"):
             from pathlib import Path
 
             from vlamech.config import protocol, split_states
@@ -172,30 +181,42 @@ class Rescue(SensorFault):
 
             t, init = int(key[4:].split("-")[0]), int(key.split("init")[1])
             states = split_states("confirmatory")
-            donor = states[(states.index(init) + 1) % len(states)]
+            donor = states[(states.index(init) + 1) % len(states)] if self.mode == "random" else init
             root = Path(__file__).resolve().parents[3]
             self.donor_cap = load_capture(root / protocol("sensor_conflict.captures")["confirmatory"] / "captures"
                                           / f"task{t}-init{donor}.npz")
 
+    def _states(self, policy, obs, instruction):
+        from vlamech.interventions.hooks import Capture, hooked
+
+        inp = policy.prepare(*obs, instruction)
+        with hooked(policy, captures=[Capture("resid", self.layer, to_cpu=False)], expected_seq_len=inp.layout.seq_len) as s:
+            policy.forward(inp)
+        return s.captures[("resid", self.layer)]
+
     def __call__(self, policy, imgs, proprio, instruction):
-        from vlamech.interventions.hooks import Capture, Intervention, hooked
-        from vlamech.interventions.patching import group_positions
+        from vlamech.interventions.hooks import Intervention, hooked
+        from vlamech.interventions.patching import group_positions, noise_patches
 
         now = (imgs["agentview"], imgs["wrist"], np.array(proprio, np.float64, copy=True))
         fed = (now[0], self.prev[1] if self.prev is not None else now[1], now[2])
-        if self.random:
-            j = min(self.q, len(self.donor_cap["step"]) - 1)
-            src = (self.donor_cap["agentview"][j], self.donor_cap["wrist"][j], self.donor_cap["proprio"][j])
-        else:
-            src = now
-        d_inp = policy.prepare(*src, instruction)
-        with hooked(policy, captures=[Capture("resid", self.layer, to_cpu=False)], expected_seq_len=d_inp.layout.seq_len) as s:
-            policy.forward(d_inp)
-        h = s.captures[("resid", self.layer)]
         inp = policy.prepare(*fed, instruction)
         pos = group_positions(inp.layout, self.group)
-        iv = Intervention("resid", self.layer, pos, "replace", h[:, torch_index(pos, h)])
-        with hooked(policy, interventions=[iv], expected_seq_len=inp.layout.seq_len):
+        if self.mode in ("random", "samephase", "otherphase"):
+            n = len(self.donor_cap["step"])
+            j = (self.q + n // 2) % n if self.mode == "otherphase" else min(self.q, n - 1)
+            src = (self.donor_cap["agentview"][j], self.donor_cap["wrist"][j], self.donor_cap["proprio"][j])
+        else:
+            src = fed if self.mode == "noop" else now
+        h = self._states(policy, src, instruction)
+        if self.mode == "noise":
+            site = ("resid", self.layer)
+            stale = self._states(policy, fed, instruction)
+            ivs = noise_patches({site: h}, {site: stale}, pos, [self.layer],
+                                seed=derive_seed("rescue_noise", self.key, self.q))
+        else:
+            ivs = [Intervention("resid", self.layer, pos, "replace", h[:, torch_index(pos, h)])]
+        with hooked(policy, interventions=ivs, expected_seq_len=inp.layout.seq_len):
             out = policy.forward(inp)
         self.prev = now
         self.q += 1
