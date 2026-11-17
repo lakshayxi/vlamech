@@ -91,6 +91,8 @@ The full plan above was cut for time, and everything reported is **exploratory**
   - A closed-loop patching rescue of the late wrist camera (`rescue_*` faults): one layer's states at the wrist or
     readout positions are replaced. The states come from the fresh frame, another episode, the same episode's clean
     rollout at the same or another phase, norm-matched noise, or the stale states themselves (no-op).
+  - **Result:** recovery is mostly task-phase information plus some state-specific information, not a generic
+    effect of replacement. Noise and other-phase donors stay near the delayed run.
 - **Rescue controls:** the donor variants separate generic replacement (noise, wrong phase) from task-phase information
   (same-phase donors) and state-specific information (the fresh state). See `results/sensor_conflict/summary.md`.
 - **Tests:** the tests above are computed on these reduced samples. P-values are Holm-corrected within each table
