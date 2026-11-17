@@ -69,6 +69,7 @@ class Experiment:
     # (every query's exact inputs, for offline replay)
     records: frozenset = frozenset()
     policies: frozenset = frozenset({"oft"})
+    sensor_faults: bool = False  # runs one of vlamech.interventions.sensor_faults (--sensor-fault)
 
 
 _ALL = frozenset({"video", "actions", "captures"})
@@ -91,6 +92,9 @@ EXPERIMENTS = {
     # clean check of a comparison model against its published success, before any corrupted run
     "model_check": Experiment("calibration", frozenset({"identity"}), "none", frozenset({"own"}),
                               records=frozenset({"video", "actions"}), policies=frozenset({"pi05"})),
+    # closed-loop sensor faults on the held-out init states, clean images (protocol sensor_conflict.faults)
+    "sensor_faults": Experiment("confirmatory", frozenset({"identity"}), "none", frozenset({"own"}),
+                                records=frozenset({"actions"}), sensor_faults=True),
     "debug": Experiment(None, None, "any", frozenset({"own", "other_task", "empty"}), allow_dirty=True, mitigation="any",
                         policies=frozenset(POLICIES)),
 }
@@ -101,13 +105,19 @@ def experiment_states(split: str, n_states: int) -> list:
 
 
 def preflight(experiment: str, states: list, spec, instruction: str, n_states: int,
-              mitigation: Optional[dict] = None, policy: str = "oft") -> dict:
+              mitigation: Optional[dict] = None, policy: str = "oft", sensor_fault: Optional[str] = None) -> dict:
     """Validate a requested run; returns {"frozen": <selection used> or None}. Raises on any violation."""
     if experiment not in EXPERIMENTS:
         raise ValueError(f"unknown experiment {experiment!r}; known: {sorted(EXPERIMENTS)}")
     ex = EXPERIMENTS[experiment]
     if policy not in ex.policies:
         raise ValueError(f"{experiment} does not run policy {policy!r}")
+    if sensor_fault and not (ex.sensor_faults or experiment == "debug"):
+        raise ValueError(f"{experiment} runs no sensor fault")
+    if ex.sensor_faults and not sensor_fault:
+        raise ValueError(f"{experiment} needs --sensor-fault")
+    if sensor_fault and mitigation:
+        raise ValueError("a sensor fault and a mitigation cannot be combined")
     if ex.mitigation == "none" and mitigation:
         raise ValueError(f"{experiment} runs no mitigation")
     if ex.mitigation in ("grid", "frozen", "monitor") and not mitigation:

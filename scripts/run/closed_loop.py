@@ -57,6 +57,8 @@ def parse_args(argv=None):
     ap.add_argument("--shard", default="0/1", help="i/n: this process runs episodes with index %% n == i")
     ap.add_argument("--run-name", default=None)
     ap.add_argument("--mitigation", default=None, help="cag:<omega>[:stop<threshold>] | horizon:<k>[:ensemble]")
+    ap.add_argument("--sensor-fault", default=None,
+                    help="sensor_faults experiment: one of vlamech.interventions.sensor_faults FAULTS / PHASE_FAULTS")
     ap.add_argument("--record-actions", action="store_true")
     ap.add_argument("--record-video", action="store_true", help="videos/<key>.mp4: scene and exact network inputs")
     ap.add_argument("--capture-queries", action="store_true",
@@ -156,7 +158,16 @@ def main(argv=None):
     action_fn, mitigation = mit.parse(args.mitigation)
     if args.policy != "oft" and (mitigation or spec.exact_model_input or args.policy_server is not None):
         raise ValueError("mitigations, the exact-model-input variant and the policy server are OFT only")
-    pre = experiments.preflight(args.experiment, states, spec, args.instruction, n_states, mitigation, args.policy)
+    if args.sensor_fault:
+        from vlamech.interventions.sensor_faults import PHASE_FAULTS, SensorFault
+
+        if args.policy != "oft":
+            raise ValueError("sensor faults are OFT only")
+        if args.sensor_fault in PHASE_FAULTS and not set(tasks) <= set(protocol("sensor_conflict.tasks")):
+            raise ValueError(f"phase faults run on the pick-and-place tasks {protocol('sensor_conflict.tasks')} only")
+        action_fn = SensorFault(args.sensor_fault)
+    pre = experiments.preflight(args.experiment, states, spec, args.instruction, n_states, mitigation, args.policy,
+                                sensor_fault=args.sensor_fault)
 
     # identity: refuses on any mismatch; debug may run from a dirty tree
     code = identity.code_identity(strict=not ex.allow_dirty, policy=args.policy)
@@ -172,7 +183,7 @@ def main(argv=None):
                "condition": spec.to_dict(), "instruction_mode": args.instruction, "replicate": args.replicate,
                "record_actions": args.record_actions, "record_video": args.record_video,
                "capture_queries": args.capture_queries, "trace_schema": TRACE_SCHEMA, "mitigation": mitigation,
-               "policy": args.policy, "policy_server": args.policy_server is not None}
+               "policy": args.policy, "policy_server": args.policy_server is not None, "sensor_fault": args.sensor_fault}
 
     from vlamech.envs.episode import run_episode
     from vlamech.envs.libero_env import LiberoTaskEnv
@@ -199,6 +210,7 @@ def main(argv=None):
         f"-stop{mitigation['safe_stop_below']:g}" if mitigation.get("safe_stop_below") is not None else "")
     chunk = mitigation["steps"] if mitigation and mitigation.get("method") == "horizon" else settings["env.open_loop_steps"]
     pol_tag = "" if args.policy == "oft" else f"__{args.policy}"
+    pol_tag += f"__fault-{args.sensor_fault}" if args.sensor_fault else ""
     run_name = args.run_name or f"{spec.tag}__ins-{args.instruction}{mit_tag}{pol_tag}__rep{args.replicate}"
     handle = mf.open_run(out_root / run_name, man, shard_i, shard_n, args.accept_code_change)
     try:
@@ -223,6 +235,8 @@ def main(argv=None):
             key = f"task{task_id}-init{init}"
             for attempt in (1, 2):
                 corruptor = EpisodeCorruptor(spec, key, sides)
+                if hasattr(action_fn, "bind"):  # sensor faults read the simulator for their phase triggers
+                    action_fn.bind(env, key)
                 video, hook = None, None
                 if args.record_video:
                     video, hook = rollout_video(handle.run_dir / "videos" / f"{key}.mp4", ins, spec.tag, suite,
