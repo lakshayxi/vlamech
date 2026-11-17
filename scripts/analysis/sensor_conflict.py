@@ -259,6 +259,11 @@ QUICK = {"dir": ROOT / "results" / "debug", "states": range(20, 30),
                     "rescue_wrist_12_random", "rescue_readout_20_random", "rescue_wrist_12_samephase",
                     "rescue_wrist_12_otherphase", "rescue_wrist_12_noise", "rescue_wrist_12_noop")}
 RESCUES = tuple(f for f in QUICK["faults"] if f.startswith("rescue_"))
+FIRST = QUICK["faults"]  # the fault and rescue tables (and their Holm families) as first reported
+# second follow-up: the fresh / random wrist rescue at other layers, and holding still until the late frame catches up
+SWEEP = (4, 8, 12, 16, 20, 24, 28)
+QUICK["faults"] += ("lag_wrist_wait", "delay_8_wait") + tuple(f"rescue_wrist_{l}{m}" for l in SWEEP if l != 12 for m in ("", "_random"))
+MAX_STEPS = 300
 # paired contrasts for the rescue controls (one Holm family): (better-if-higher arm, reference arm)
 CONTRASTS = (("rescue_wrist_12", "rescue_wrist_12_samephase"), ("rescue_wrist_12_samephase", "rescue_wrist_12_otherphase"),
              ("rescue_wrist_12", "rescue_wrist_12_random"), ("rescue_wrist_12", "rescue_wrist_12_otherphase"),
@@ -281,6 +286,34 @@ def behaviour(tr: dict) -> dict:
     closed = opening < 0.04
     return {"speed": float(v.mean()) if len(v) else 0.0, "reversal": float((cos < 0).mean()) if len(cos) else 0.0,
             "grasp_cycles": int((closed[1:] & ~closed[:-1]).sum())}
+
+
+KINDS = ("success", "other task", "lifted, not placed", "moved, not lifted", "never moved it")
+LIFT_M, MOVE_M = 0.03, 0.02
+
+
+def outcome(tr: dict, task: int) -> dict:
+    """How an episode ended, from its trace (rough proxies, chosen after the runs): the instructed goal; another task's
+    goal that was not true at the start; the object to grasp raised more than 3 cm above its start but not placed;
+    moved more than 2 cm without being raised; or barely touched. Also whether a non-target object moved > 2 cm."""
+    goals, ids = np.asarray(tr["goals"]), [int(t) for t in tr["goal_task_ids"]]
+    names = [str(n) for n in tr["obj_names"]]
+    tg = tr["targets"][task]
+    pos = np.asarray(tr["obj_pos"])
+    disp = np.linalg.norm(pos - pos[0], axis=-1)
+    man = names.index(tg["manipulated_objects"][0])
+    others = [names.index(n) for n in tg["non_target_objects"] if n in names]
+    if goals[-1, ids.index(task)]:
+        kind = "success"
+    elif any(goals[-1, k] and not goals[0, k] for k, t in enumerate(ids) if t != task):
+        kind = "other task"
+    elif (pos[:, man, 2] - pos[0, man, 2]).max() > LIFT_M:
+        kind = "lifted, not placed"
+    elif disp[:, man].max() > MOVE_M:
+        kind = "moved, not lifted"
+    else:
+        kind = "never moved it"
+    return {"kind": kind, "bumped_other": bool(others and disp[:, others].max() > MOVE_M)}
 
 
 def closed_loop(partial: bool, quick: bool = False) -> dict:
@@ -314,11 +347,17 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
         for k, r in rd.records.items():
             t = k[0]
             col = r["max_contact_force"]["environment"] > thr["force"][str(t)]["environment"]
+            tr = trace(rd, k)
             rows.append({"fault": f, "task": t, "init_state": k[1], "success": bool(r["success"]),
-                         "unsafe": bool(col or r["off_table"]), "steps": r["steps"], **behaviour(trace(rd, k))})
+                         "unsafe": bool(col or r["off_table"]), "collision": bool(col), "off_table": bool(r["off_table"]),
+                         "steps": r["steps"], **behaviour(tr), **outcome(tr, t)})
     df = pd.DataFrame(rows)
-    out = {"missing": missing, "faults": {}}
-    tables = ((("faults", QUICK["faults"][1:], pick),) if quick else
+    out = {"missing": missing, "faults": {}, "outcomes": {}}
+    for f, d in df.groupby("fault", sort=False):
+        out["outcomes"][f] = {"n": int(len(d)), **{k: int((d.kind == k).sum()) for k in KINDS},
+                              "collision": int(d.collision.sum()), "off_table": int(d.off_table.sum()),
+                              "bumped_other": int(d.bumped_other.sum())}
+    tables = ((("faults", FIRST[1:], pick),) if quick else
               (("faults", FAULTS[1:], range(10)), ("phase_faults", PHASE_FAULTS, pick)))
     for table, names, tasks in tables:
         res = {}
@@ -378,6 +417,42 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
         if "rescue_wrist_12_noop" in runs:
             j = paired("lag_wrist", "rescue_wrist_12_noop")[1]
             noop = {"n": int(len(j)), "same_outcome_and_steps": int(((j.success_0 == j.success_1) & (j.steps_0 == j.steps_1)).sum())}
+        sweep = {}
+        for m in ("", "_random"):
+            for l in SWEEP:
+                f = f"rescue_wrist_{l}{m}"
+                if f in runs:
+                    r, j = paired("lag_wrist", f)
+                    sweep[f] = r | {"layer": l, "donor": "random" if m else "fresh", "success": float(j.success_1.mean()),
+                                    "unsafe": float(j.unsafe_1.mean()),
+                                    "success_wilson": list(wilson_ci(int(j.success_1.sum()), len(j)))}
+        for m in ("success", "unsafe"):
+            for f, p in zip(sweep, holm([r[f"{m}_p"] for r in sweep.values()]) if sweep else []):
+                sweep[f][f"{m}_p_holm"] = float(p)
+        out["sweep"] = sweep
+        out["wait"] = {}
+        for wf, late in (("lag_wrist_wait", "lag_wrist"), ("delay_8_wait", "delay_8")):
+            if wf not in runs:
+                continue
+            w = {"late": late}
+            d = df[df.fault == wf].copy()
+            d["success_300"] = d.success & (d.steps <= MAX_STEPS)
+            for ref in (late, "none"):
+                j = df[df.fault == ref].set_index(["task", "init_state"]).join(
+                    d.set_index(["task", "init_state"]), lsuffix="_0", rsuffix="_1", how="inner").reset_index()
+                for m, col in (("success", "success_1"), ("success_300", "success_300"), ("unsafe", "unsafe_1")):
+                    b = boot(j, lambda x, c=col, m=m: float(x[c].mean() - x[f"{'unsafe' if m == 'unsafe' else 'success'}_0"].mean()))
+                    tag = "late" if ref == late else ref
+                    w[f"{m}_vs_{tag}"] = [b["estimate"], b["ci_low"], b["ci_high"]]
+                    w[f"{m}_vs_{tag}_p"] = mcnemar_exact(j[f"{'unsafe' if m == 'unsafe' else 'success'}_0"].to_numpy(),
+                                                         j[col].to_numpy())["p"]
+            w |= {"n": int(len(d)), "success": float(d.success.mean()), "success_300": float(d.success_300.mean()),
+                  "unsafe": float(d.unsafe.mean()), "success_wilson": list(wilson_ci(int(d.success.sum()), len(d))),
+                  "success_300_wilson": list(wilson_ci(int(d.success_300.sum()), len(d))),
+                  "median_steps_success": float(d[d.success].steps.median()) if d.success.any() else None,
+                  "median_steps_plain": float(df[(df.fault == "none") & df.success].steps.median()),
+                  "late_success": float(df[df.fault == late].success.mean())}
+            out["wait"][wf] = w
         fresh = con
         out["rescue"] = {"delayed_success": float(base.success.mean()), "delayed_unsafe": float(base.unsafe.mean()),
                          "arms": res, "contrasts": fresh, "noop_check": noop}
@@ -494,6 +569,41 @@ def report(s: dict) -> str:
             L.append(f"\nNo-op check: putting the stale states back reproduces the unpatched delayed run in "
                      f"{c['same_outcome_and_steps']}/{c['n']} episodes (same outcome and same number of steps).")
         L.append("")
+    if cl.get("sweep"):
+        L += ["## Rescue by layer (second follow-up, exploratory)", "",
+              "The same rescue of the 0.4 s late wrist camera with the wrist positions' states replaced at one layer, from the "
+              "fresh frame or from another episode (random). Paired against the delayed run; Holm over this table.", "",
+              "| layer | donor | n | success [95% Wilson] | vs delayed [95% CI] | p (Holm) | unsafe |", "|---|---|---|---|---|---|---|"]
+        for f, e in cl["sweep"].items():
+            L.append(f"| {e['layer']} | {e['donor']} | {e['n']} | {e['success']:.3f} [{e['success_wilson'][0]:.2f}, "
+                     f"{e['success_wilson'][1]:.2f}] | {fmt(e['success_diff'], 3)} | {e['success_p_holm']:.3g} | {e['unsafe']:.3f} |")
+        L.append("")
+    if cl.get("wait"):
+        L += ["## Waiting for the late frame (second follow-up, exploratory)", "",
+              "The input is still 0.4 s late, but the robot holds still for 8 steps before every query, so the late "
+              "observation shows the scene as it is. Nothing uses a frame that has not arrived. lag_wrist_wait: only the "
+              "wrist camera is late (as in the rescue); delay_8_wait: every source is late (as in delay_8). Holding doubles "
+              "the time, so the episode gets 600 steps; 'within 300' counts only successes inside the normal budget. "
+              "Paired against the late run without waiting and against the plain run; exact McNemar, uncorrected.", "",
+              "| arm | late run success | success (600 steps) | within 300 | vs late [95% CI] | p | vs plain [95% CI] | p | unsafe | vs late [95% CI] | median steps of a success (plain) |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
+        for wf, w in cl["wait"].items():
+            L.append(f"| {wf} | {w['late_success']:.3f} | {w['success']:.3f} | {w['success_300']:.3f} | "
+                     f"{fmt(w['success_vs_late'], 3)} | {w['success_vs_late_p']:.3g} | {fmt(w['success_vs_none'], 3)} | "
+                     f"{w['success_vs_none_p']:.3g} | {w['unsafe']:.3f} | {fmt(w['unsafe_vs_late'], 3)} | "
+                     f"{w['median_steps_success']} ({w['median_steps_plain']}) |")
+        L.append("")
+    if cl.get("outcomes"):
+        L += ["## How episodes end (second follow-up, exploratory)", "",
+              "From the saved traces, with rough cut-offs chosen after the runs: another task's goal became true; the object "
+              "to grasp was raised more than 3 cm but not placed; moved more than 2 cm but not raised; or barely moved. The "
+              "unsafe outcome is a collision above the task's clean maximum force or an object off the table; 'bumped' counts "
+              "episodes where an object outside the task moved more than 2 cm (not part of the unsafe outcome).", "",
+              "| run | n | " + " | ".join(KINDS) + " | collision | off table | bumped |", "|---|---|" + "---|" * (len(KINDS) + 3)]
+        for f, e in cl["outcomes"].items():
+            L.append(f"| {f} | {e['n']} | " + " | ".join(str(e[k]) for k in KINDS) +
+                     f" | {e['collision']} | {e['off_table']} | {e['bumped_other']} |")
+        L.append("")
     if cl.get("missing"):
         L.append(f"Closed-loop runs not complete: {', '.join(cl['missing'])}.")
     return "\n".join(L) + "\n"
@@ -554,6 +664,8 @@ def figures(s: dict):
         _closed_fig(plt, cl)
     if cl.get("rescue", {}).get("arms"):
         _combined_fig(plt, s)
+    if cl.get("sweep") or cl.get("wait"):
+        _followup_fig(plt, s)
 
 
 def _patch_fig(plt, pt, name):
@@ -689,6 +801,79 @@ def _combined_fig(plt, s):
     ax.set_xlabel("closed-loop task success (95% Wilson CI), 60 paired episodes", fontsize=8, color=INK)
     ax.set_title("(b) closed loop: wrist frame 0.4 s late, states replaced at one layer", fontsize=8.5, color=INK, loc="left")
     fig.savefig(FIG / "rescue.png", dpi=250, bbox_inches="tight", facecolor=SURF)
+    plt.close(fig)
+
+
+KIND_COLORS = {"success": "#1baf7a", "other task": "#8a5cd1", "lifted, not placed": "#e8a317",
+               "moved, not lifted": "#7fb3e8", "never moved it": "#c9c7bf"}
+
+
+def _followup_fig(plt, s):
+    """Second follow-up: (a) rescue success by layer, (b) waiting for the late frame, (c) how episodes end."""
+    cl = s["closed_loop"]
+    none, r = cl["faults"]["none"], cl["rescue"]
+    fig, axes = plt.subplots(1, 3, figsize=(14.5, 4.2), facecolor=SURF, gridspec_kw={"width_ratios": [1.1, 0.9, 1.3]})
+    ax = axes[0]
+    _style(ax)
+    sw = dict(cl.get("sweep", {}))
+    for f, col, lab in (("", COLORS["agentview"], "fresh frame's states"), ("_random", MUTED, "another episode's states")):
+        pts = sorted((e["layer"], e["success"], e["success_wilson"]) for k, e in sw.items() if k.endswith("_random") == bool(f))
+        if pts:
+            x = [p[0] for p in pts]
+            y = np.array([p[1] for p in pts])
+            ci = np.array([p[2] for p in pts])
+            ax.errorbar(x, y, yerr=[y - ci[:, 0], ci[:, 1] - y], color=col, lw=1.8, marker="o", ms=6, mec=SURF,
+                        capsize=0, elinewidth=1, label=lab)
+    ax.axhline(none["success"], color=INK, lw=0.9, ls="--")
+    ax.text(28.5, none["success"] + 0.02, "plain", fontsize=7.5, color=INK, ha="right", va="bottom")
+    ax.axhline(r["delayed_success"], color=COLORS["wrist"], lw=0.9, ls="--")
+    ax.text(28.5, r["delayed_success"] + 0.02, "wrist 0.4 s late", fontsize=7.5, color=COLORS["wrist"], ha="right", va="bottom")
+    ax.set_xticks(list(SWEEP))
+    ax.set_ylim(0, 1.05)
+    ax.set_xlabel("layer whose wrist-token states are replaced", fontsize=8, color=INK)
+    ax.set_ylabel("closed-loop task success (95% Wilson CI)", fontsize=8, color=INK)
+    ax.legend(frameon=False, fontsize=7.5, loc="lower left")
+    ax.set_title("(a) rescue by layer (needs the fresh frame)", fontsize=9, color=INK, loc="left")
+    ax = axes[1]
+    _style(ax)
+    groups = [(wf, w) for wf, w in cl.get("wait", {}).items()]
+    names = {"lag_wrist_wait": "wrist camera late", "delay_8_wait": "every sensor late"}
+    for gi, (wf, w) in enumerate(groups):
+        late = cl["faults"].get(w["late"], {})
+        bars = [("late", late.get("success", np.nan), late.get("success_wilson", [np.nan] * 2), COLORS["wrist"]),
+                ("late + wait", w["success"], w["success_wilson"], KIND_COLORS["success"]),
+                ("plain", none["success"], none["success_wilson"], INK)]
+        for bi, (lab, v, ci, col) in enumerate(bars):
+            x = gi * 3.6 + bi
+            ax.bar(x, v, 0.86, color=col, edgecolor=SURF, linewidth=1, label=lab if gi == 0 else None)
+            ax.errorbar(x, v, yerr=[[v - ci[0]], [ci[1] - v]], fmt="none", ecolor=MUTED, elinewidth=1)
+            ax.text(x, v + 0.04, f"{v:.0%}", ha="center", fontsize=7.5, color=INK)
+    ax.set_xticks([gi * 3.6 + 1 for gi in range(len(groups))], [names[wf] for wf, _ in groups], fontsize=8, color=INK)
+    ax.set_ylim(0, 1.12)
+    ax.legend(frameon=False, fontsize=7.5, loc="upper center", ncol=3, bbox_to_anchor=(0.5, -0.1))
+    ax.set_title("(b) hold still 0.4 s before each query", fontsize=9, color=INK, loc="left")
+    ax = axes[2]
+    _style(ax)
+    ax.grid(axis="y", visible=False)
+    oc = cl["outcomes"]
+    rows = [("none", "plain"), ("lag_wrist", "wrist late"), ("lag_wrist_wait", "wrist late + wait"),
+            ("rescue_wrist_12", "wrist late + patch L12"), ("delay_8", "every sensor late"),
+            ("delay_8_wait", "every sensor late + wait"), ("gripper_stuck", "gripper reading stuck")]
+    rows = [(f, lab) for f, lab in rows if f in oc]
+    for yi, (f, lab) in enumerate(rows[::-1]):
+        left = 0.0
+        for k in KINDS:
+            v = oc[f][k] / oc[f]["n"]
+            ax.barh(yi, v, 0.72, left=left, color=KIND_COLORS[k], edgecolor=SURF, linewidth=1.5,
+                    label=k if yi == 0 else None)
+            left += v
+    ax.set_yticks(range(len(rows)), [lab for _, lab in rows[::-1]], fontsize=8, color=INK)
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("share of the 60 paired episodes", fontsize=8, color=INK)
+    ax.legend(frameon=False, fontsize=7, loc="upper center", ncol=3, bbox_to_anchor=(0.45, -0.14))
+    ax.set_title("(c) how episodes end", fontsize=9, color=INK, loc="left")
+    fig.tight_layout(w_pad=2.5)
+    fig.savefig(FIG / "followup.png", dpi=250, bbox_inches="tight", facecolor=SURF)
     plt.close(fig)
 
 

@@ -107,3 +107,31 @@ def test_delay_feeds_the_frame_k_steps_back():
             f(pol, imgs, p, "do it")
         f.observe(step, SimpleNamespace(agentview=imgs["agentview"], wrist=imgs["wrist"], proprio=p), None, False, {})
     assert [int(a[0, 0, 0]) for a, _, _ in pol.fed] == [0, 6, 14]
+
+
+def test_wait_holds_still_every_other_query_and_feeds_the_frame_from_the_hold():
+    f = SensorFault("lag_wrist_wait")
+    _bind(f)
+    pol = FakePolicy()
+    held = []
+    for q in range(5):
+        imgs, p = _obs(q)
+        acts, _, info = f(pol, imgs, p, "do it")
+        if info.get("hold"):
+            held.append(q)
+            assert not acts[:, :6].any() and (acts[:, 6] == 1.0).all()  # no motion, gripper command kept
+    assert f.step_factor == 2 and held == [1, 3]
+    # queries 2 and 4 see the wrist frame of the hold query before them, the third-person frame of their own
+    assert [(int(a[0, 0, 0]), int(w[0, 0, 0])) for a, w, _ in pol.fed] == [(0, 100), (2, 101), (4, 103)]
+
+
+def test_delay_wait_feeds_the_frame_taken_when_the_hold_began():
+    f = SensorFault("delay_8_wait")
+    _bind(f)
+    pol = FakePolicy()
+    for step in range(40):
+        imgs, p = _obs(step)
+        if step % 8 == 0:
+            f(pol, imgs, p, "do it")
+        f.observe(step, SimpleNamespace(agentview=imgs["agentview"], wrist=imgs["wrist"], proprio=p), None, False, {})
+    assert [int(a[0, 0, 0]) for a, _, _ in pol.fed] == [0, 8, 24]
