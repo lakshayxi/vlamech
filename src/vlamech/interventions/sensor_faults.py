@@ -16,6 +16,9 @@ because the phase triggers read object and hand positions from the simulator (ne
                   query: approach = hand within 15 cm of the object to grasp; grasp = the query whose chunk first commands
                   closing; transport = three queries later; place = after the grasp, the object within 15 cm (horizontal)
                   of the goal region (the second argument of the task's goal predicate)
+  lag_wrist_wait  lag_wrist, but the robot holds still for one chunk (8 steps) before every query, so the late wrist
+                  frame shows the scene as it is now; a recovery that uses only frames that have arrived. Holding
+                  doubles the time, so the episode gets twice the step budget (step_factor)
 """
 from __future__ import annotations
 
@@ -31,7 +34,8 @@ OFFSET_M = 0.03
 NEAR_M = 0.15
 FREEZE_QUERIES = 2
 GRIP_CLOSED_BELOW = 0.5
-FAULTS = ("none", "proprio_offset", "gripper_stuck", "lag_agentview", "lag_wrist", "lag_proprio", "lag_all")
+FAULTS = ("none", "proprio_offset", "gripper_stuck", "lag_agentview", "lag_wrist", "lag_proprio", "lag_all",
+          "lag_wrist_wait")
 PHASE_FAULTS = ("freeze_approach", "freeze_grasp", "freeze_transport", "freeze_place")
 DELAY_STEPS = (2, 4, 8, 16)  # 0.1, 0.2, 0.4, 0.8 s at 20 Hz
 DELAY_FAULTS = tuple(f"delay_{k}" for k in DELAY_STEPS)
@@ -42,6 +46,7 @@ class SensorFault:
         if name not in FAULTS + PHASE_FAULTS + DELAY_FAULTS:
             raise ValueError(f"unknown sensor fault {name!r}; known: {FAULTS + PHASE_FAULTS + DELAY_FAULTS}")
         self.name = name
+        self.step_factor = 2 if name == "lag_wrist_wait" else 1
         self.env, self.key = None, None
         self.reset()
 
@@ -64,6 +69,7 @@ class SensorFault:
         self.trigger_q: Optional[int] = None
         self.held: Optional[tuple] = None
         self.frames: dict = {}  # control step -> (agentview, wrist, proprio), filled by observe()
+        self.last_action: Optional[np.ndarray] = None
 
     def observe(self, step, frame, fed, fresh, goals) -> None:
         """frame_hook: record every control step's observation (for delay_<k>)."""
@@ -104,6 +110,12 @@ class SensorFault:
             self.first_proprio = now[2].copy()
         fed = list(now)
         active = False
+        if self.name == "lag_wrist_wait" and self.q % 2 == 1:  # hold still: zero motion, keep the gripper command
+            hold = np.zeros((8, 7))
+            hold[:, 6] = self.last_action[6]
+            self.prev = now
+            self.q += 1
+            return hold, np.zeros((8, 7), np.float32), {"fault_active": True, "hold": True}
         if self.name == "proprio_offset":
             fed[2] = now[2].copy()
             fed[2][:3] += self.offset
@@ -114,7 +126,7 @@ class SensorFault:
             active = True
         elif self.name.startswith("lag_"):
             prev = self.prev if self.prev is not None else now
-            which = SOURCES if self.name == "lag_all" else (self.name[4:],)
+            which = SOURCES if self.name == "lag_all" else ("wrist",) if self.name == "lag_wrist_wait" else (self.name[4:],)
             for s in which:
                 fed[SOURCES.index(s)] = prev[SOURCES.index(s)]
             active = self.prev is not None
@@ -133,6 +145,7 @@ class SensorFault:
             self.grasp_q = self.q
         if self.name in PHASE_FAULTS and self.trigger_q is None and self._triggered():
             self.trigger_q, self.held = self.q, now
+        self.last_action = np.asarray(out["actions"])[-1].copy()
         info = {"fault_active": bool(active)}
         if self.name in PHASE_FAULTS:
             info["trigger_query"] = self.trigger_q
@@ -145,6 +158,8 @@ class SensorFault:
 RESCUE_MODES = ("fresh", "random", "samephase", "otherphase", "noise", "noop")
 RESCUES = ("rescue_wrist_12", "rescue_readout_20", "rescue_wrist_12_random", "rescue_readout_20_random",
            "rescue_wrist_12_samephase", "rescue_wrist_12_otherphase", "rescue_wrist_12_noise", "rescue_wrist_12_noop")
+SWEEP_LAYERS = (4, 8, 16, 20, 24, 28)  # layer sweep of the fresh and random wrist rescues (exploratory follow-up)
+RESCUES += tuple(f"rescue_wrist_{l}{m}" for l in SWEEP_LAYERS for m in ("", "_random"))
 
 
 class Rescue(SensorFault):

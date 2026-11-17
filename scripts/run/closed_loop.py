@@ -265,7 +265,7 @@ def main(argv=None):
                     hook = _chain(hook, action_fn.observe)
                 res, extra = run_episode(env, policy, init, corruptor, instruction=ins,
                                          mask_fn=env.masks if needs_masks else None, record_actions=args.record_actions,
-                                         condition=spec.tag, max_steps=settings["env.max_steps"], chunk=chunk,
+                                         condition=spec.tag, max_steps=settings["env.max_steps"] * getattr(action_fn, "step_factor", 1), chunk=chunk,
                                          frame_hook=hook, capture=args.capture_queries, action_fn=action_fn)
                 if video is not None:
                     video.close(keep=res.error is None)
