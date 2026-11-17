@@ -262,7 +262,9 @@ RESCUES = tuple(f for f in QUICK["faults"] if f.startswith("rescue_"))
 FIRST = QUICK["faults"]  # the fault and rescue tables (and their Holm families) as first reported
 # second follow-up: the fresh / random wrist rescue at other layers, and holding still until the late frame catches up
 SWEEP = (4, 8, 12, 16, 20, 24, 28)
-QUICK["faults"] += ("lag_wrist_wait", "delay_8_wait") + tuple(f"rescue_wrist_{l}{m}" for l in SWEEP if l != 12 for m in ("", "_random"))
+MITIGATIONS = (("lag_wrist_warp", "lag_wrist"), ("lag_wrist_slow", "lag_wrist"), ("lag_wrist_waitopen", "lag_wrist"),
+               ("lag_wrist_wait", "lag_wrist"), ("delay_8_wait", "delay_8"))
+QUICK["faults"] += tuple(m for m, _ in MITIGATIONS) + tuple(f"rescue_wrist_{l}{m}" for l in SWEEP if l != 12 for m in ("", "_random"))
 MAX_STEPS = 300
 # paired contrasts for the rescue controls (one Holm family): (better-if-higher arm, reference arm)
 CONTRASTS = (("rescue_wrist_12", "rescue_wrist_12_samephase"), ("rescue_wrist_12_samephase", "rescue_wrist_12_otherphase"),
@@ -431,7 +433,7 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
                 sweep[f][f"{m}_p_holm"] = float(p)
         out["sweep"] = sweep
         out["wait"] = {}
-        for wf, late in (("lag_wrist_wait", "lag_wrist"), ("delay_8_wait", "delay_8")):
+        for wf, late in MITIGATIONS:
             if wf not in runs:
                 continue
             w = {"late": late}
@@ -451,7 +453,8 @@ def closed_loop(partial: bool, quick: bool = False) -> dict:
                   "success_300_wilson": list(wilson_ci(int(d.success_300.sum()), len(d))),
                   "median_steps_success": float(d[d.success].steps.median()) if d.success.any() else None,
                   "median_steps_plain": float(df[(df.fault == "none") & df.success].steps.median()),
-                  "late_success": float(df[df.fault == late].success.mean())}
+                  "late_success": float(df[df.fault == late].success.mean()),
+                  "late_unsafe": float(df[df.fault == late].unsafe.mean())}
             out["wait"][wf] = w
         fresh = con
         out["rescue"] = {"delayed_success": float(base.success.mean()), "delayed_unsafe": float(base.unsafe.mean()),
@@ -579,18 +582,21 @@ def report(s: dict) -> str:
                      f"{e['success_wilson'][1]:.2f}] | {fmt(e['success_diff'], 3)} | {e['success_p_holm']:.3g} | {e['unsafe']:.3f} |")
         L.append("")
     if cl.get("wait"):
-        L += ["## Waiting for the late frame (second follow-up, exploratory)", "",
-              "The input is still 0.4 s late, but the robot holds still for 8 steps before every query, so the late "
-              "observation shows the scene as it is. Nothing uses a frame that has not arrived. lag_wrist_wait: only the "
-              "wrist camera is late (as in the rescue); delay_8_wait: every source is late (as in delay_8). Holding doubles "
-              "the time, so the episode gets 600 steps; 'within 300' counts only successes inside the normal budget. "
-              "Paired against the late run without waiting and against the plain run; exact McNemar, uncorrected.", "",
-              "| arm | late run success | success (600 steps) | within 300 | vs late [95% CI] | p | vs plain [95% CI] | p | unsafe | vs late [95% CI] | median steps of a success (plain) |",
+        L += ["## Mitigations that use only data that has arrived (second follow-up, exploratory)", "",
+              "The input stays 0.4 s late. lag_wrist_*: only the wrist camera is late (as in the rescue); delay_8_wait: every "
+              "source is late (as in delay_8).", "",
+              "- warp: the late wrist frame reprojected to the current camera pose (from fresh proprio) on the table plane.",
+              "- slow: every commanded motion halved.",
+              "- waitopen: hold still for 8 steps before a query only while the fresh finger reading says the gripper is open.",
+              "- wait: hold still for 8 steps before every query, so the late frame shows the scene as it is.", "",
+              "Arms that slow the robot get 600 steps; 'within 300' counts only successes inside the normal budget. Paired "
+              "against the late run without mitigation and against the plain run; exact McNemar, uncorrected.", "",
+              "| arm | late run success | success | within 300 | vs late [95% CI] | p | vs plain [95% CI] | p | unsafe (late run) | vs late [95% CI] | median steps of a success (plain) |",
               "|---|---|---|---|---|---|---|---|---|---|---|"]
         for wf, w in cl["wait"].items():
             L.append(f"| {wf} | {w['late_success']:.3f} | {w['success']:.3f} | {w['success_300']:.3f} | "
                      f"{fmt(w['success_vs_late'], 3)} | {w['success_vs_late_p']:.3g} | {fmt(w['success_vs_none'], 3)} | "
-                     f"{w['success_vs_none_p']:.3g} | {w['unsafe']:.3f} | {fmt(w['unsafe_vs_late'], 3)} | "
+                     f"{w['success_vs_none_p']:.3g} | {w['unsafe']:.3f} ({w['late_unsafe']:.3f}) | {fmt(w['unsafe_vs_late'], 3)} | "
                      f"{w['median_steps_success']} ({w['median_steps_plain']}) |")
         L.append("")
     if cl.get("outcomes"):
@@ -812,7 +818,7 @@ def _followup_fig(plt, s):
     """Second follow-up: (a) rescue success by layer, (b) waiting for the late frame, (c) how episodes end."""
     cl = s["closed_loop"]
     none, r = cl["faults"]["none"], cl["rescue"]
-    fig, axes = plt.subplots(1, 3, figsize=(14.5, 4.2), facecolor=SURF, gridspec_kw={"width_ratios": [1.1, 0.9, 1.3]})
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.4), facecolor=SURF, gridspec_kw={"width_ratios": [1.0, 1.0, 1.15]})
     ax = axes[0]
     _style(ax)
     sw = dict(cl.get("sweep", {}))
@@ -836,29 +842,51 @@ def _followup_fig(plt, s):
     ax.set_title("(a) rescue by layer (needs the fresh frame)", fontsize=9, color=INK, loc="left")
     ax = axes[1]
     _style(ax)
-    groups = [(wf, w) for wf, w in cl.get("wait", {}).items()]
-    names = {"lag_wrist_wait": "wrist camera late", "delay_8_wait": "every sensor late"}
-    for gi, (wf, w) in enumerate(groups):
-        late = cl["faults"].get(w["late"], {})
-        bars = [("late", late.get("success", np.nan), late.get("success_wilson", [np.nan] * 2), COLORS["wrist"]),
-                ("late + wait", w["success"], w["success_wilson"], KIND_COLORS["success"]),
-                ("plain", none["success"], none["success_wilson"], INK)]
-        for bi, (lab, v, ci, col) in enumerate(bars):
-            x = gi * 3.6 + bi
-            ax.bar(x, v, 0.86, color=col, edgecolor=SURF, linewidth=1, label=lab if gi == 0 else None)
-            ax.errorbar(x, v, yerr=[[v - ci[0]], [ci[1] - v]], fmt="none", ecolor=MUTED, elinewidth=1)
-            ax.text(x, v + 0.04, f"{v:.0%}", ha="center", fontsize=7.5, color=INK)
-    ax.set_xticks([gi * 3.6 + 1 for gi in range(len(groups))], [names[wf] for wf, _ in groups], fontsize=8, color=INK)
-    ax.set_ylim(0, 1.12)
-    ax.legend(frameon=False, fontsize=7.5, loc="upper center", ncol=3, bbox_to_anchor=(0.5, -0.1))
-    ax.set_title("(b) hold still 0.4 s before each query", fontsize=9, color=INK, loc="left")
+    ax.grid(axis="y", visible=False)
+    ax.grid(axis="x", color=GRID, lw=0.6)
+    w = cl.get("wait", {})
+    fl = cl["faults"]
+    rows = [("wrist camera 0.4 s late", None), ("no mitigation", ("lag_wrist", fl.get("lag_wrist"), COLORS["wrist"])),
+            ("warp to current pose", ("lag_wrist_warp", w.get("lag_wrist_warp"), MUTED)),
+            ("move at half speed", ("lag_wrist_slow", w.get("lag_wrist_slow"), MUTED)),
+            ("wait, only before the grasp", ("lag_wrist_waitopen", w.get("lag_wrist_waitopen"), MUTED)),
+            ("wait before every query", ("lag_wrist_wait", w.get("lag_wrist_wait"), KIND_COLORS["success"])),
+            ("every sensor 0.4 s late", None), ("no mitigation", ("delay_8", fl.get("delay_8"), COLORS["wrist"])),
+            ("wait before every query", ("delay_8_wait", w.get("delay_8_wait"), KIND_COLORS["success"]))]
+    ypos, labels, yy = [], [], 0.0
+    for lab, row in rows:
+        if row is None:
+            yy -= 0.3
+            ax.text(-0.02, yy, lab, fontsize=7.5, color=MUTED, ha="right", va="center", style="italic",
+                    transform=ax.get_yaxis_transform())
+            yy -= 0.8
+            continue
+        f, e, col = row
+        if e is None:
+            continue
+        v, ci = e["success"], e["success_wilson"]
+        ax.plot(ci, [yy, yy], color=col, lw=2.2, solid_capstyle="round", alpha=0.6)
+        ax.plot(v, yy, "o", color=col, ms=7, mec=SURF, mew=1.2)
+        steps = e.get("median_steps_success")
+        ax.text(1.03, yy, f"{v:.0%}" + (f"  ({steps:.0f} steps)" if steps and f in w else ""), va="center", fontsize=7.5, color=INK)
+        ypos.append(yy)
+        labels.append(lab)
+        yy -= 1.0
+    ax.axvline(none["success"], color=INK, lw=0.9, ls="--")
+    ax.text(none["success"], 0.75, "plain", fontsize=7.5, color=INK, ha="center")
+    ax.set_yticks(ypos, labels, fontsize=8, color=INK)
+    ax.set_ylim(yy + 0.4, 1.0)
+    ax.set_xlim(0, 1.0)
+    ax.set_xlabel("task success (95% Wilson CI); median steps of a success", fontsize=8, color=INK)
+    ax.set_title("(b) mitigations using only data that has arrived", fontsize=9, color=INK, loc="left")
     ax = axes[2]
     _style(ax)
     ax.grid(axis="y", visible=False)
     oc = cl["outcomes"]
-    rows = [("none", "plain"), ("lag_wrist", "wrist late"), ("lag_wrist_wait", "wrist late + wait"),
-            ("rescue_wrist_12", "wrist late + patch L12"), ("delay_8", "every sensor late"),
-            ("delay_8_wait", "every sensor late + wait"), ("gripper_stuck", "gripper reading stuck")]
+    rows = [("none", "plain"), ("lag_wrist", "wrist late"), ("lag_wrist_warp", "+ warp"), ("lag_wrist_slow", "+ half speed"),
+            ("lag_wrist_waitopen", "+ wait before the grasp"), ("lag_wrist_wait", "+ wait every query"),
+            ("rescue_wrist_12", "+ patch L12 (fresh frame)"), ("delay_8", "every sensor late"),
+            ("delay_8_wait", "+ wait every query"), ("gripper_stuck", "gripper reading stuck")]
     rows = [(f, lab) for f, lab in rows if f in oc]
     for yi, (f, lab) in enumerate(rows[::-1]):
         left = 0.0
